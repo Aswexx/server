@@ -6,3 +6,122 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum Role {
+  normal
+  admin
+}
+
+model User {
+  id    String  @id @default(uuid()) @db.Char(36)
+  name  String
+  alias String
+  role  Role    @default(normal)
+  bio   String?
+
+  avatar         Image  @relation("avatar", fields: [avatarFilename], references: [id])
+  avatarFilename String @unique @map("avatar_filename")
+
+  bgImage         Image  @relation("bgImage", fields: [bgImageFilename], references: [id])
+  bgImageFilename String @unique @map("bg_image_filename")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  posts       Post[]
+  comments    Comment[]
+  likePosts   LikePost[]
+  likeComment LikeComment[]
+  follow      FollowingShip[] @relation("follow")
+  followed    FollowingShip[] @relation("followed")
+
+  @@map("users")
+}
+
+model Post {
+  id       String @id @default(uuid()) @db.Char(36)
+  contents String
+
+  image    Image  @relation(fields: [imageUrl], references: [id])
+  imageUrl String @unique @map("image_url")
+
+  video     String
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @default(now()) @map("updated_at")
+  liked     LikePost[]
+
+  author   User   @relation(fields: [authorId], references: [id])
+  authorId String @map("author_id")
+
+  @@map("posts")
+}
+
+model LikePost {
+  id        String   @id @default(uuid()) @db.Char(36)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post   Post   @relation(fields: [postId], references: [id])
+  postId String @map("post_id")
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String @map("user_id")
+
+  @@map("like_posts")
+}
+
+model Comment {
+  id        String   @id @default(uuid()) @db.Char(36)
+  contents  String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  liked LikeComment[]
+
+  author   User   @relation(fields: [authorId], references: [id])
+  authorId String @map("author_id")
+
+  image    Image  @relation(fields: [imageUrl], references: [id])
+  imageUrl String @unique @map("image_url")
+
+  @@map("comments")
+}
+
+model LikeComment {
+  id String @id @default(uuid()) @db.Char(36)
+
+  comment   Comment @relation(fields: [commentId], references: [id])
+  commentId String  @map("comment_id")
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String @map("user_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("like_comments")
+}
+
+model FollowingShip {
+  id         String @id @default(uuid()) @db.Char(36)
+  follower   User   @relation("follow", fields: [followerId], references: [id])
+  followerId String @map("follower_id")
+
+  followed   User   @relation("followed", fields: [followedId], references: [id])
+  followedId String @map("followed_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("following_ships")
+}
+
+model Image {
+  id        String   @id @default(uuid()) @db.Char(36)
+  filename  String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  avatarUser  User?    @relation("avatar")
+  bgImageUser User?    @relation("bgImage")
+  post        Post?
+  comment     Comment?
+
+  @@map("images")
+}
