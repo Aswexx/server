@@ -1,0 +1,15 @@
+#dependency
+/node_modules
+
+#misc
+.DS_Store
+.env
+
+#production
+/build
+
+#config
+.eslint*
+tsconfig.json
+
+#testing
