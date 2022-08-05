@@ -14,16 +14,17 @@ enum Role {
 
 model User {
   id    String  @id @default(uuid()) @db.Char(36)
-  name  String
-  alias String
+  name  String  @unique
+  alias String  @unique
+  email String  @unique
   role  Role    @default(normal)
   bio   String?
 
-  avatar         Image  @relation("avatar", fields: [avatarFilename], references: [id])
-  avatarFilename String @unique @map("avatar_filename")
+  avatar    Image? @relation("avatar", fields: [avatarUrl], references: [id])
+  avatarUrl String @unique @map("avatar_url")
 
-  bgImage         Image  @relation("bgImage", fields: [bgImageFilename], references: [id])
-  bgImageFilename String @unique @map("bg_image_filename")
+  bgImage    Image? @relation("bgImage", fields: [bgImageUrl], references: [id])
+  bgImageUrl String @unique @map("bg_image_url")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @map("updated_at")
@@ -42,10 +43,14 @@ model Post {
   id       String @id @default(uuid()) @db.Char(36)
   contents String
 
-  image    Image  @relation(fields: [imageUrl], references: [id])
-  imageUrl String @unique @map("image_url")
+  comments Comment[]
 
-  video     String
+  image    Image?  @relation(fields: [imageUrl], references: [id])
+  imageUrl String? @unique @map("image_url")
+
+  video    Video?  @relation(fields: [videoUrl], references: [id])
+  videoUrl String? @unique @map("video_url")
+
   createdAt DateTime   @default(now()) @map("created_at")
   updatedAt DateTime   @default(now()) @map("updated_at")
   liked     LikePost[]
@@ -54,6 +59,16 @@ model Post {
   authorId String @map("author_id")
 
   @@map("posts")
+}
+
+model Video {
+  id        String   @id @default(uuid()) @db.Char(36)
+  url       String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post Post?
+
+  @@map("videos")
 }
 
 model LikePost {
@@ -77,10 +92,13 @@ model Comment {
 
   liked LikeComment[]
 
+  onPost Post   @relation(fields: [postId], references: [id])
+  postId String @map("post_id")
+
   author   User   @relation(fields: [authorId], references: [id])
   authorId String @map("author_id")
 
-  image    Image  @relation(fields: [imageUrl], references: [id])
+  image    Image? @relation(fields: [imageUrl], references: [id])
   imageUrl String @unique @map("image_url")
 
   @@map("comments")
@@ -115,7 +133,7 @@ model FollowingShip {
 
 model Image {
   id        String   @id @default(uuid()) @db.Char(36)
-  filename  String
+  url       String
   createdAt DateTime @default(now()) @map("created_at")
 
   avatarUser  User?    @relation("avatar")

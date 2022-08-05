@@ -1,21 +1,33 @@
 import { PrismaClient } from '@prisma/client'
+import { faker } from '@faker-js/faker'
 const prisma = new PrismaClient()
 
 async function main () {
-  const alice = await prisma.user.create({
-    data: {
-      name: 'alice',
-      alias: '222',
-      avatar: {
-        create: { filename: '22' }
-      },
-      bgImage: {
-        create: { filename: '22' }
+  for (let i = 0; i < 2; i++) {
+    const fakeUser = await prisma.user.create({
+      data: {
+        name: faker.name.findName(),
+        alias: faker.name.middleName(),
+        email: faker.internet.email(),
+        bio: faker.lorem.paragraph(),
+        avatar: {
+          create: { url: faker.internet.avatar() }
+        },
+        bgImage: {
+          create: { url: faker.image.nature(640, 480, true) }
+        },
+        posts: {
+          createMany: {
+            data: [
+              { contents: faker.lorem.text() },
+              { contents: faker.lorem.text() },
+              { contents: faker.lorem.text() }]
+          }
+        }
       }
-    }
-  })
-
-  console.log(alice)
+    })
+    console.log(fakeUser)
+  }
 }
 
 main()
