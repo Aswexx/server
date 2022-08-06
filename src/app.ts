@@ -1,9 +1,22 @@
-import { Request, Response } from 'express'
-const app = require('express')()
+import express from 'express'
+import helmet from 'helmet'
+import passport from 'passport'
+import cookieSession from 'cookie-session'
+import { authRouter, oAuthConfig } from './routers/auth'
+const app = express()
 require('dotenv').config()
 
-app.use('/', (_:Request, res: Response) => {
-  res.send('hi')
-})
+// middlewares
+app.use(helmet())
+app.use(cookieSession({
+  name: 'c-s',
+  maxAge: 24 * 60 * 60 * 1000,
+  keys: [oAuthConfig.SESSION_KEY1, oAuthConfig.SESSION_KEY2]
+}))
+
+app.use(passport.initialize())
+app.use(passport.session())
+
+app.use(authRouter)
 
 export = app
