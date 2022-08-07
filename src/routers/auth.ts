@@ -1,6 +1,7 @@
 import express, { Express, Request, Response, NextFunction } from 'express'
 import passport from 'passport'
 import { Strategy, StrategyOptionsWithRequest, VerifyCallback, Profile } from 'passport-google-oauth20'
+import { upsertUser } from '../models/users.model'
 require('dotenv').config()
 
 export
@@ -33,12 +34,21 @@ declare global {
   }
 }
 
-function verifyCallback (req: Request, accessToken: string, refreshToken: string, profile: Profile, done: VerifyCallback) {
+async function verifyCallback (req: Request, accessToken: string, refreshToken: string, profile: Profile, done: VerifyCallback) {
   if (!req.user) {
     console.log('id: ' + profile.id)
     console.log('name: ' + profile.displayName)
     console.log('email: ' + profile.emails?.[0].value)
     console.log('avatar: ' + profile.photos?.[0].value)
+
+    const data = {
+      id: profile.id,
+      name: profile.displayName,
+      email: profile.emails?.[0].value as string,
+      avatar: profile.photos?.[0].value as string
+    }
+
+    await upsertUser(data)
   }
   done(null, profile)
 }
@@ -104,13 +114,17 @@ authRouter.get('/secret', checkLoggedIn, hasPermission, (_req: Request, res: Res
   res.send('Secret Value is 53!')
 })
 
-authRouter.use('/', (_req: Request, res: Response) => {
-  res.send(`
-    <h1>Hi!</h1>
-    <a href='/secret'>Take Secret</a>
-    <br>
-    <a href='/auth/google'>google sign in</a>
-    <br>
-    <a href='/auth/logout'>google sign out</a>
-  `)
+authRouter.get('/auth', (req: Request, res: Response) => {
+  // res.send(`
+  //   <h1>Hi!</h1>
+  //   <a href='/secret'>Take Secret</a>
+  //   <br>
+  //   <a href='/auth/google'>google sign in</a>
+  //   <br>
+  //   <a href='/auth/logout'>google sign out</a>
+  // `)
+  // console.log(__dirname)
+  // res.sendFile('index.html')
+  res.redirect('/auth/google')
+  // res.json({ success: true })
 })
