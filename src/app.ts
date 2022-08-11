@@ -5,22 +5,27 @@ import passport from 'passport'
 import cookieSession from 'cookie-session'
 import { authRouter, oAuthConfig } from './routers/auth'
 import { usersRouter } from './routers/users/users.router'
+import { postsRouter } from './routers/posts/posts.router'
 import cors from 'cors'
 const app = express()
 require('dotenv').config()
 
-const whitelist = [
-  'http://localhost:8080'
-]
-// middlewares
+// const whitelist = [
+//   'http://localhost:8080'
+// ]
+// // middlewares
+// app.use(cors({
+//   origin: (origin, callback) => {
+//     if (whitelist.indexOf(origin as string) !== -1) {
+//       callback(null, true)
+//     } else {
+//       callback(new Error('Not allowed by CORS'))
+//     }
+//   }
+// }))
+
 app.use(cors({
-  origin: (origin, callback) => {
-    if (whitelist.indexOf(origin as string) !== -1) {
-      callback(null, true)
-    } else {
-      callback(new Error('Not allowed by CORS'))
-    }
-  }
+  origin: 'http://localhost:8080'
 }))
 
 app.use(helmet())
@@ -34,9 +39,11 @@ app.use(passport.initialize())
 app.use(passport.session())
 
 app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
 app.use('/test', express.static(path.join(__dirname, '..', 'public')))
 
 app.use('/users', usersRouter)
+app.use('/posts', postsRouter)
 app.use(authRouter)
 
 export = app
