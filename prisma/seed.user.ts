@@ -1,19 +1,9 @@
 import { PrismaClient } from '@prisma/client'
 import { faker } from '@faker-js/faker'
+import { generatePosts } from './seed.post'
 const prisma = new PrismaClient()
 
-// function USER_GENERATOR (count: number): POST[] {
-//   const newPosts: POST[] = []
-//   for (let i = 0; i < count; i++) {
-//     newPosts.push({
-//       authorId,
-//       contents: faker.lorem.text()
-//     })
-//   }
-//   return newPosts
-// }
-
-const GENERATE_USER_COUNT = 10
+const GENERATE_USER_COUNT = 1
 
 async function generateFakeUsers () {
   for (let i = 0; i < GENERATE_USER_COUNT; i++) {
@@ -31,14 +21,7 @@ async function generateFakeUsers () {
         },
         posts: {
           createMany: {
-            data: [
-              { contents: faker.lorem.text() },
-              { contents: faker.lorem.text() },
-              { contents: faker.lorem.text() },
-              { contents: faker.lorem.text() },
-              { contents: faker.lorem.text() },
-              { contents: faker.lorem.text() }
-            ]
+            data: generatePosts(Math.ceil(Math.random() * 10))
           }
         }
       }

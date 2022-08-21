@@ -44,15 +44,81 @@ async function upsertUser (data: UserData) {
   }
 }
 
-async function getUser (data: NormalLoginInfo) {
+interface FollowRelation {
+  followerId: string
+  followedId: string
+}
+
+async function addUserFollowShip (updateInfo: FollowRelation) {
   try {
-    const { account, password } = data
-    if (account === 'dev123' && password === '123') {
-      const user = await prisma.user.findFirst({
-        where: { name: 'Joe Stark' },
+    const result = await prisma.followingShip.create({
+      data: {
+        followerId: updateInfo.followerId,
+        followedId: updateInfo.followedId
+      }
+    })
+
+    await prisma.$disconnect()
+    return result
+  } catch (e) {
+    console.log(e)
+    await prisma.$disconnect()
+    process.exit(1)
+  }
+}
+
+async function deleteUserFollowShip (followShipId: string) {
+  try {
+    const result = await prisma.followingShip.delete({
+      where: { id: followShipId }
+    })
+
+    await prisma.$disconnect()
+    return result
+  } catch (e) {
+    console.log(e)
+    await prisma.$disconnect()
+    process.exit(1)
+  }
+}
+
+interface UserState {
+  id?: string,
+  isLoginUser: boolean
+}
+
+async function getUser (userState: UserState, loginInfo?: NormalLoginInfo) {
+  try {
+    if (!userState.isLoginUser) {
+      return await prisma.user.findFirst({
+        where: { id: userState.id },
         include: {
           avatar: { select: { url: true } },
-          bgImage: { select: { url: true } }
+          bgImage: { select: { url: true } },
+          follow: {
+            where: { followerId: userState.id }
+          },
+          followed: {
+            where: { followedId: userState.id }
+          }
+        }
+      })
+    }
+
+    const devUser = 'a27e52a2-14e3-401e-82d2-19356adbbb81'
+    const { account, password } = loginInfo as NormalLoginInfo
+    if (account === 'dev123' && password === '123') {
+      const user = await prisma.user.findFirst({
+        where: { name: 'Nelson Bailey' },
+        include: {
+          avatar: { select: { url: true } },
+          bgImage: { select: { url: true } },
+          follow: {
+            where: { followerId: devUser }
+          },
+          followed: {
+            where: { followedId: devUser }
+          }
         }
       })
 
@@ -68,9 +134,10 @@ async function getUser (data: NormalLoginInfo) {
   }
 }
 
-async function getPopUsers () {
+async function getPopUsers (userId: string) {
   try {
     const users = await prisma.user.findMany({
+      where: { id: { notIn: [userId] } },
       orderBy: {
         posts: {
           _count: 'desc'
@@ -82,7 +149,8 @@ async function getPopUsers () {
         alias: true,
         avatar: {
           select: { url: true }
-        }
+        },
+        followed: true
       },
       take: 10
     })
@@ -99,7 +167,9 @@ async function getPopUsers () {
 export {
   upsertUser,
   getUser,
-  getPopUsers
+  getPopUsers,
+  addUserFollowShip,
+  deleteUserFollowShip
 }
 
 // main()

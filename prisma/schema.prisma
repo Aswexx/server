@@ -84,6 +84,7 @@ model LikePost {
   @@map("like_posts")
 }
 
+// TODO:add new field commentOnComment
 model Comment {
   id        String   @id @default(uuid()) @db.Char(36)
   contents  String
@@ -98,8 +99,8 @@ model Comment {
   author   User   @relation(fields: [authorId], references: [id])
   authorId String @map("author_id")
 
-  image    Image? @relation(fields: [imageUrl], references: [id])
-  imageUrl String @unique @map("image_url")
+  image    Image?  @relation(fields: [imageUrl], references: [id])
+  imageUrl String? @unique @map("image_url")
 
   @@map("comments")
 }
@@ -128,6 +129,7 @@ model FollowingShip {
 
   createdAt DateTime @default(now()) @map("created_at")
 
+  @@unique([followerId, followedId])
   @@map("following_ships")
 }
 

@@ -1,12 +1,14 @@
 import express from 'express'
 import path from 'path'
-import helmet from 'helmet'
+// import helmet from 'helmet'
 import passport from 'passport'
 import cookieSession from 'cookie-session'
 import { authRouter, oAuthConfig } from './routers/auth'
 import { usersRouter } from './routers/users/users.router'
 import { postsRouter } from './routers/posts/posts.router'
+import { commentsRouter } from './routers/comments/comments.router'
 import cors from 'cors'
+import morgan from 'morgan'
 const app = express()
 require('dotenv').config()
 
@@ -25,10 +27,11 @@ require('dotenv').config()
 // }))
 
 app.use(cors({
-  origin: 'http://localhost:8080'
+  origin: '*'
 }))
+// app.use(helmet())
+app.use(morgan('dev'))
 
-app.use(helmet())
 app.use(cookieSession({
   name: 'c-s',
   maxAge: 24 * 60 * 60 * 1000,
@@ -44,6 +47,7 @@ app.use('/test', express.static(path.join(__dirname, '..', 'public')))
 
 app.use('/users', usersRouter)
 app.use('/posts', postsRouter)
+app.use('/comments', commentsRouter)
 app.use(authRouter)
 
 export = app

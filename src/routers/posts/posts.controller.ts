@@ -7,7 +7,7 @@ import {
 } from '../../models/posts.model'
 
 async function httpGetPosts (req: Request, res: Response) {
-  const { skipPostsCount } = req.params
+  const { skipPostsCount } = req.query
 
   const result = await getPosts('newestTen', Number(skipPostsCount))
 
@@ -19,7 +19,6 @@ async function httpGetUserPosts (req: Request, res: Response) {
     const { userId } = req.params
 
     const result = await getUserPosts(userId)
-    console.log(result)
     res.json(result)
   } catch (e) {
     console.log(e)

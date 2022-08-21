@@ -8,9 +8,9 @@ import {
 
 const postsRouter = express.Router()
 
-postsRouter.get('/:userId/newestTen', httpGetUserPosts)
-postsRouter.delete('/:postId', httpDeletePost)
-postsRouter.get('/:skipPostsCount', httpGetPosts)
+postsRouter.get('/recent/:userId', httpGetUserPosts)
+postsRouter.get('/relative-posts', httpGetPosts)
 postsRouter.post('/', httpCreatPost)
+postsRouter.delete('/:postId', httpDeletePost)
 
 export { postsRouter }

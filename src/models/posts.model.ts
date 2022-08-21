@@ -7,10 +7,27 @@ const postSelector = {
   id: true,
   contents: true,
   createdAt: true,
-  comments: true,
   liked: true,
+  comments: {
+    select: {
+      id: true,
+      contents: true,
+      createdAt: true,
+      imageUrl: true,
+      author: {
+        select: {
+          name: true,
+          alias: true,
+          avatar: {
+            select: { url: true }
+          }
+        }
+      }
+    }
+  },
   author: {
     select: {
+      id: true,
       name: true,
       alias: true,
       avatar: {
@@ -32,7 +49,6 @@ async function getPosts (cond: string, skip: number) {
 }
 
 async function getUserPosts (userId: string, skip: number = 0) {
-  userId = '02324dd0-a321-472a-a94e-819cb51341f9'
   const result = prisma.post.findMany({
     where: { authorId: userId },
     select: postSelector,
@@ -40,8 +56,6 @@ async function getUserPosts (userId: string, skip: number = 0) {
     skip,
     take: 10
   })
-  console.log(result)
-
   return result
 }
 
