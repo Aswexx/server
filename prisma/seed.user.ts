@@ -3,7 +3,7 @@ import { faker } from '@faker-js/faker'
 import { generatePosts } from './seed.post'
 const prisma = new PrismaClient()
 
-const GENERATE_USER_COUNT = 1
+const GENERATE_USER_COUNT = 5
 
 async function generateFakeUsers () {
   for (let i = 0; i < GENERATE_USER_COUNT; i++) {

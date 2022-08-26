@@ -105,11 +105,11 @@ async function getUser (userState: UserState, loginInfo?: NormalLoginInfo) {
       })
     }
 
-    const devUser = 'a27e52a2-14e3-401e-82d2-19356adbbb81'
+    const devUser = '3750f2af-1a10-4727-b9c9-6027dd8007d4'
     const { account, password } = loginInfo as NormalLoginInfo
     if (account === 'dev123' && password === '123') {
       const user = await prisma.user.findFirst({
-        where: { name: 'Nelson Bailey' },
+        where: { id: devUser },
         include: {
           avatar: { select: { url: true } },
           bgImage: { select: { url: true } },

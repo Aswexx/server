@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-constructor */
 import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
@@ -5,24 +6,42 @@ interface Comment {
   authorId: string
   postId: string
   contents: string
-  imageUrl?: string
+  fileKey?: string
+  mediaType?: string
+}
+
+class CommentData {
+  constructor (public comment: Comment) { }
+
+  setQuery () {
+    const query = {
+      contents: this.comment.contents,
+      author: {
+        connect: { id: this.comment.authorId }
+      },
+      onPost: {
+        connect: { id: this.comment.postId }
+      },
+      media: {}
+    }
+
+    if (this.comment.mediaType) {
+      query.media = {
+        create: {
+          type: this.comment.mediaType,
+          url: this.comment.fileKey
+        }
+      }
+    }
+
+    return query
+  }
 }
 
 async function createComment (comment: Comment) {
   try {
     const result = await prisma.comment.create({
-      data: {
-        contents: comment.contents,
-        author: {
-          connect: { id: comment.authorId }
-        },
-        onPost: {
-          connect: { id: comment.postId }
-        }
-        // image: {
-        //   create: { url: comment.imageUrl as string }
-        // }
-      },
+      data: new CommentData(comment).setQuery(),
       include: {
         author: {
           select: {

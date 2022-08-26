@@ -77,7 +77,7 @@ function checkLoggedIn (req: Request, res: Response, next: NextFunction): void |
 }
 
 function hasPermission (req: Request, res: Response, next: NextFunction): void {
-  // *TODO: some permission checking
+  // TODO: some permission checking
   next()
 }
 

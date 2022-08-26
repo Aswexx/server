@@ -20,11 +20,11 @@ model User {
   role  Role    @default(normal)
   bio   String?
 
-  avatar    Image? @relation("avatar", fields: [avatarUrl], references: [id])
-  avatarUrl String @unique @map("avatar_url")
+  avatar    ProfileImage? @relation("avatar", fields: [avatarUrl], references: [id])
+  avatarUrl String        @unique @map("avatar_url")
 
-  bgImage    Image? @relation("bgImage", fields: [bgImageUrl], references: [id])
-  bgImageUrl String @unique @map("bg_image_url")
+  bgImage    ProfileImage? @relation("bgImage", fields: [bgImageUrl], references: [id])
+  bgImageUrl String        @unique @map("bg_image_url")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @map("updated_at")
@@ -45,11 +45,8 @@ model Post {
 
   comments Comment[]
 
-  image    Image?  @relation(fields: [imageUrl], references: [id])
-  imageUrl String? @unique @map("image_url")
-
-  video    Video?  @relation(fields: [videoUrl], references: [id])
-  videoUrl String? @unique @map("video_url")
+  media    MediaFile? @relation(fields: [mediaUrl], references: [id])
+  mediaUrl String?    @unique @map("media_url")
 
   createdAt DateTime   @default(now()) @map("created_at")
   updatedAt DateTime   @default(now()) @map("updated_at")
@@ -59,16 +56,6 @@ model Post {
   authorId String @map("author_id")
 
   @@map("posts")
-}
-
-model Video {
-  id        String   @id @default(uuid()) @db.Char(36)
-  url       String
-  createdAt DateTime @default(now()) @map("created_at")
-
-  post Post?
-
-  @@map("videos")
 }
 
 model LikePost {
@@ -84,7 +71,6 @@ model LikePost {
   @@map("like_posts")
 }
 
-// TODO:add new field commentOnComment
 model Comment {
   id        String   @id @default(uuid()) @db.Char(36)
   contents  String
@@ -99,8 +85,8 @@ model Comment {
   author   User   @relation(fields: [authorId], references: [id])
   authorId String @map("author_id")
 
-  image    Image?  @relation(fields: [imageUrl], references: [id])
-  imageUrl String? @unique @map("image_url")
+  media    MediaFile? @relation(fields: [mediaUrl], references: [id])
+  mediaUrl String?    @unique @map("media_url")
 
   @@map("comments")
 }
@@ -133,15 +119,26 @@ model FollowingShip {
   @@map("following_ships")
 }
 
-model Image {
+model ProfileImage {
   id        String   @id @default(uuid()) @db.Char(36)
   url       String
   createdAt DateTime @default(now()) @map("created_at")
 
-  avatarUser  User?    @relation("avatar")
-  bgImageUser User?    @relation("bgImage")
-  post        Post?
-  comment     Comment?
+  avatarUser  User? @relation("avatar")
+  bgImageUser User? @relation("bgImage")
+  // post        Post?
+  // comment     Comment?
 
-  @@map("images")
+  @@map("profile_images")
+}
+
+model MediaFile {
+  id        String   @id @default(uuid()) @db.Char(36)
+  url       String
+  createdAt DateTime @default(now()) @map("created_at")
+  post      Post?
+  comment   Comment?
+  type      String
+
+  @@map("media_file")
 }

@@ -1,7 +1,6 @@
+/* eslint-disable no-useless-constructor */
 import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
-
-// const getCondition = 'newestTen'
 
 const postSelector = {
   id: true,
@@ -13,7 +12,9 @@ const postSelector = {
       id: true,
       contents: true,
       createdAt: true,
-      imageUrl: true,
+      media: {
+        select: { url: true, type: true }
+      },
       author: {
         select: {
           name: true,
@@ -59,13 +60,43 @@ async function getUserPosts (userId: string, skip: number = 0) {
   return result
 }
 
-async function createPost (authorId: string, contents: string) {
+interface Post {
+  authorId: string
+  contents: string
+  fileKey?: string
+  mediaType?: string
+}
+// TODO: intergate Class PostData and CommentData
+
+class PostData {
+  constructor (public post: Post) { }
+
+  setQuery () {
+    const query = {
+      author: {
+        connect: { id: this.post.authorId }
+      },
+      contents: this.post.contents,
+      media: {}
+    }
+
+    if (this.post.mediaType) {
+      query.media = {
+        create: {
+          type: this.post.mediaType,
+          url: this.post.fileKey
+        }
+      }
+    }
+
+    return query
+  }
+}
+
+async function createPost (newPost: Post) {
   try {
     const result = await prisma.post.create({
-      data: {
-        authorId,
-        contents
-      },
+      data: new PostData(newPost).setQuery(),
       select: postSelector
     })
     await prisma.$disconnect()
