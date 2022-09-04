@@ -13,5 +13,6 @@
 #config
 .eslint*
 tsconfig.json
+.gitignore
 
 #testing

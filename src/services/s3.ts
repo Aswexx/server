@@ -1,8 +1,6 @@
 import { PutObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import crypto from 'crypto'
-import dotenv from 'dotenv'
-dotenv.config()
 
 const awsConfig = {
   bucketName: process.env.AWS_BUCKET_NAME,

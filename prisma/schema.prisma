@@ -126,8 +126,6 @@ model ProfileImage {
 
   avatarUser  User? @relation("avatar")
   bgImageUser User? @relation("bgImage")
-  // post        Post?
-  // comment     Comment?
 
   @@map("profile_images")
 }
@@ -141,4 +139,12 @@ model MediaFile {
   type      String
 
   @@map("media_file")
+}
+
+model LoginInfo {
+  id         String @id @default(uuid()) @db.Char(36)
+  loginEmail String @unique @map("login_email")
+  password   String @unique
+
+  @@map("login_info")
 }

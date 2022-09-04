@@ -1,7 +1,7 @@
 import express, { Express, Request, Response, NextFunction } from 'express'
 import passport from 'passport'
 import { Strategy, StrategyOptionsWithRequest, VerifyCallback, Profile } from 'passport-google-oauth20'
-import { upsertUser } from '../models/users.model'
+// import { upsertUser } from '../models/users.model'
 require('dotenv').config()
 
 export
@@ -47,19 +47,23 @@ async function verifyCallback (req: Request, accessToken: string, refreshToken: 
       email: profile.emails?.[0].value as string,
       avatar: profile.photos?.[0].value as string
     }
-
-    await upsertUser(data)
+    console.log(data)
+    console.log('📌111', accessToken)
+    console.log('📌222', refreshToken)
+    // await upsertUser(data)
   }
   done(null, profile)
 }
 
 //* save session to cookie
 passport.serializeUser((user, done) => {
+  console.log('❤️111', user)
   done(null, user.id)
 })
 
 //* read sesssion from cookie so that req.user is available
 passport.deserializeUser((user: Express.User, done) => {
+  console.log('❤️222', user)
   done(null, user)
 })
 
@@ -82,8 +86,10 @@ function hasPermission (req: Request, res: Response, next: NextFunction): void {
 }
 
 authRouter.get('/show', (req: Request, res: Response) => {
-  res.send(`${req.user}
-  `)
+  // res.send(`${req.user}
+  // `)
+  res.status(302).redirect('http://localhost:8080/checked')
+  // res.status(302).json({ result: 'OK' })
 })
 
 authRouter.get('/auth/google/callback', passport.authenticate('google', {

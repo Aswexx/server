@@ -1,4 +1,6 @@
 import { PrismaClient } from '@prisma/client'
+import { compareSync } from '../util/bcrypt'
+import jwt from 'jsonwebtoken'
 const prisma = new PrismaClient()
 
 interface UserData {
@@ -8,15 +10,55 @@ interface UserData {
   avatar: string
 }
 
+interface registerData {
+  [key: string]: string
+}
+
 interface NormalLoginInfo {
   account: string
   password: string
 }
 
+function getRandomString (randomBytes: number): string {
+  return require('crypto').randomBytes(randomBytes).toString('hex')
+}
+
+async function createUser (data: registerData) {
+  const { email, password, name, alias, picture } = data
+  try {
+    // * not to save password if using google sign up
+    if (password) {
+      await prisma.loginInfo.create({
+        data: { loginEmail: email, password }
+      })
+    }
+    const result = await prisma.user.create({
+      data: {
+        name,
+        email,
+        alias,
+        avatar: {
+          create: { url: picture || 'default_avatar1.png' }
+        },
+        bgImage: {
+          create: { url: 'default_bg1.jpg' }
+        }
+      }
+    })
+
+    await prisma.$disconnect()
+    return result
+  } catch (err) {
+    await prisma.$disconnect()
+    console.log(err)
+    process.exit(1)
+  }
+}
+
 async function upsertUser (data: UserData) {
   try {
     const { id, name, email, avatar } = data
-    const alias = `${name}${Math.ceil(Math.random() * 100)}`
+    const alias = `${name}${getRandomString(4)}`
     const user = await prisma.user.upsert({
       where: { email },
       update: {},
@@ -105,8 +147,38 @@ async function getUser (userState: UserState, loginInfo?: NormalLoginInfo) {
       })
     }
 
-    const devUser = '3750f2af-1a10-4727-b9c9-6027dd8007d4'
     const { account, password } = loginInfo as NormalLoginInfo
+
+    if (account !== 'dev123') {
+      const hash = await prisma.loginInfo.findUnique({
+        where: { loginEmail: account },
+        select: { password: true }
+      })
+
+      if (!hash) throw new Error('Data not found')
+      if (!compareSync(password, hash.password)) {
+        return ''
+      }
+
+      const user = await prisma.user.findFirst({
+        where: { email: account },
+        include: {
+          avatar: { select: { url: true } },
+          bgImage: { select: { url: true } },
+          follow: {
+            select: { follower: true }
+          },
+          followed: {
+            select: { followedId: true }
+          }
+        }
+      })
+
+      await prisma.$disconnect()
+      return user
+    }
+    //* Dev login
+    const devUser = '3750f2af-1a10-4727-b9c9-6027dd8007d4'
     if (account === 'dev123' && password === '123') {
       const user = await prisma.user.findFirst({
         where: { id: devUser },
@@ -114,10 +186,10 @@ async function getUser (userState: UserState, loginInfo?: NormalLoginInfo) {
           avatar: { select: { url: true } },
           bgImage: { select: { url: true } },
           follow: {
-            where: { followerId: devUser }
+            select: { follower: true }
           },
           followed: {
-            where: { followedId: devUser }
+            select: { followedId: true }
           }
         }
       })
@@ -130,7 +202,39 @@ async function getUser (userState: UserState, loginInfo?: NormalLoginInfo) {
   } catch (err) {
     console.log(err)
     await prisma.$disconnect()
-    process.exit(1)
+  }
+}
+
+async function getGoogleUser (token: string) {
+  try {
+    const decoded = jwt.decode(token, { json: true })
+    if (!decoded) throw new Error('Can not get info from Google accesstoken')
+
+    const { email, name, picture } = decoded
+    const user = await prisma.user.findFirst({
+      where: { email },
+      include: {
+        avatar: { select: { url: true } },
+        bgImage: { select: { url: true } },
+        follow: {
+          select: { follower: true }
+        },
+        followed: {
+          select: { followedId: true }
+        }
+      }
+    })
+
+    if (!user) {
+      const newUser = await createUser({ email, name, picture, alias: `${name}_${getRandomString(4)}` })
+      await prisma.$disconnect()
+      return newUser
+    }
+    await prisma.$disconnect()
+    return user
+  } catch (err) {
+    console.log(err)
+    await prisma.$disconnect()
   }
 }
 
@@ -166,7 +270,9 @@ async function getPopUsers (userId: string) {
 
 export {
   upsertUser,
+  createUser,
   getUser,
+  getGoogleUser,
   getPopUsers,
   addUserFollowShip,
   deleteUserFollowShip
