@@ -23,6 +23,9 @@ const postSelector = {
             select: { url: true }
           }
         }
+      },
+      liked: {
+        select: { userId: true }
       }
     }
   },
@@ -93,6 +96,21 @@ class PostData {
   }
 }
 
+async function getPost (postId: string) {
+  try {
+    const result = await prisma.post.findFirst({
+      where: { id: postId },
+      select: postSelector
+    })
+
+    await prisma.$disconnect()
+    return result
+  } catch (e) {
+    console.error(e)
+    await prisma.$disconnect()
+  }
+}
+
 async function createPost (newPost: Post) {
   try {
     const result = await prisma.post.create({
@@ -104,7 +122,43 @@ async function createPost (newPost: Post) {
   } catch (err) {
     console.log(err)
     await prisma.$disconnect()
-    process.exit(1)
+  }
+}
+
+async function createLikePost (info: { [key: string]: string }) {
+  try {
+    const result = await prisma.likePost.create({
+      data: {
+        postId: info.postId,
+        userId: info.userId
+      },
+      include: {
+        post: {
+          select: { authorId: true }
+        }
+      }
+    })
+    await prisma.$disconnect()
+    return result
+  } catch (e) {
+    console.error(e)
+    await prisma.$disconnect()
+  }
+}
+
+async function deleteLikePost (info: {[key: string]: string}) {
+  try {
+    const result = await prisma.likePost.deleteMany({
+      where: {
+        postId: info.postId,
+        userId: info.userId
+      }
+    })
+    await prisma.$disconnect()
+    return result
+  } catch (e) {
+    console.error(e)
+    await prisma.$disconnect()
   }
 }
 
@@ -116,15 +170,17 @@ async function deletePost (postId: string) {
     await prisma.$disconnect()
     return result
   } catch (err) {
-    console.log(err)
+    console.error(err)
     await prisma.$disconnect()
-    process.exit(1)
   }
 }
 
 export {
+  getPost,
   getPosts,
   getUserPosts,
   createPost,
+  createLikePost,
+  deleteLikePost,
   deletePost
 }

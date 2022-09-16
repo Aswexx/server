@@ -14,7 +14,7 @@
   "license": "ISC",
   "devDependencies": {
     "@faker-js/faker": "^7.3.0",
-    "@prisma/client": "^4.1.1",
+    "@prisma/client": "^4.3.1",
     "@types/bcrypt": "^5.0.0",
     "@types/cookie-parser": "^1.4.3",
     "@types/cookie-session": "^2.0.44",
@@ -35,7 +35,7 @@
     "eslint-plugin-import": "^2.26.0",
     "eslint-plugin-n": "^15.2.4",
     "eslint-plugin-promise": "^6.0.0",
-    "prisma": "^4.1.1",
+    "prisma": "^4.3.1",
     "ts-node": "^10.9.1"
   },
   "dependencies": {
@@ -53,7 +53,8 @@
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.7.8",
     "passport": "^0.5.3",
-    "passport-google-oauth20": "^2.0.0"
+    "passport-google-oauth20": "^2.0.0",
+    "socket.io": "^4.5.2"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

@@ -7,6 +7,8 @@ import { authRouter, oAuthConfig } from './routers/auth'
 import { usersRouter } from './routers/users/users.router'
 import { postsRouter } from './routers/posts/posts.router'
 import { commentsRouter } from './routers/comments/comments.router'
+import { notifRouter } from './routers/notifications/notif.router'
+
 import cors from 'cors'
 import morgan from 'morgan'
 import cookieParser from 'cookie-parser'
@@ -53,6 +55,7 @@ app.use('/test', express.static(path.join(__dirname, '..', 'public')))
 app.use('/users', usersRouter)
 app.use('/posts', authenticateToken, postsRouter)
 app.use('/comments', commentsRouter)
+app.use('/notifications', notifRouter)
 app.use(authRouter)
 
 export = app

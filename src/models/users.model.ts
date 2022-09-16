@@ -97,6 +97,9 @@ async function addUserFollowShip (updateInfo: FollowRelation) {
       data: {
         followerId: updateInfo.followerId,
         followedId: updateInfo.followedId
+      },
+      include: {
+        follower: { select: { name: true } }
       }
     })
 

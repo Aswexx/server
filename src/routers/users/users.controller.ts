@@ -2,15 +2,17 @@ import { Request, Response } from 'express'
 import {
   // upsertUser,
   getUser,
-  // createUser,
+  createUser,
   getPopUsers,
   addUserFollowShip,
   deleteUserFollowShip,
   getGoogleUser
 } from '../../models/users.model'
+import { createNotif, NotifType } from '../../models/notif.model'
 // import { sendMail } from '../../services/gmail'
 import { hashSync } from '../../util/bcrypt'
 import { generateTokens, refreshTokenList } from '../../util/tokens'
+import { interactEE } from './../../notificationSocket'
 
 async function httpCreateUser (req: Request, res: Response) {
   const userData = req.body
@@ -18,9 +20,9 @@ async function httpCreateUser (req: Request, res: Response) {
   // TODO: validate email availbility
   // TODO: validate unique infos
   userData.password = hashSync(userData.password)
-  // const result = await createUser(userData)
+  const result = await createUser(userData)
 
-  res.json(userData)
+  res.json(result)
   // res.redirect('http://localhost:8080/#/register')
 }
 
@@ -36,6 +38,14 @@ async function httpUpsertUser (req: Request, res: Response) {
 async function httpAddUserFollowShip (req: Request, res: Response) {
   const updateInfo = req.body
   const user = await addUserFollowShip(updateInfo)
+  const notif = await createNotif({
+    receiverId: user.followedId,
+    informerId: user.followerId,
+    notifType: NotifType.follow
+  })
+
+  interactEE.emit('follow', notif)
+
   res.json(user)
 }
 
@@ -100,6 +110,11 @@ async function httpGetGoolgeUser (req: Request, res: Response) {
   res.json(user)
 }
 
+function httpLogout () {
+  // TODO: clean token session
+  console.log('logout')
+}
+
 export {
   httpUpsertUser,
   httpCreateUser,
@@ -107,5 +122,6 @@ export {
   httpGetPopUsers,
   httpAddUserFollowShip,
   httpDeleteUserFollowShip,
-  httpGetGoolgeUser
+  httpGetGoolgeUser,
+  httpLogout
 }
