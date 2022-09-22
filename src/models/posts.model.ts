@@ -43,7 +43,45 @@ const postSelector = {
 
 async function getPosts (cond: string, skip: number) {
   const result = await prisma.post.findMany({
-    select: postSelector,
+    select: {
+      id: true,
+      contents: true,
+      createdAt: true,
+      liked: true,
+      comments: {
+        select: {
+          id: true,
+          contents: true,
+          createdAt: true,
+          media: {
+            select: { url: true, type: true }
+          },
+          author: {
+            select: {
+              name: true,
+              alias: true,
+              avatar: {
+                select: { url: true }
+              }
+            }
+          },
+          liked: {
+            select: { userId: true }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      },
+      author: {
+        select: {
+          id: true,
+          name: true,
+          alias: true,
+          avatar: {
+            select: { url: true }
+          }
+        }
+      }
+    },
     orderBy: { createdAt: 'desc' },
     skip,
     take: 10

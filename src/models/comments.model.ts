@@ -23,6 +23,27 @@ class CommentData {
     media: {}
   }
 
+  join = {
+    author: {
+      select: {
+        name: true,
+        alias: true,
+        avatar: {
+          select: { url: true }
+        }
+      }
+    },
+    // onPost: {
+    //   select: { authorId: true }
+    // },
+    onPost: {},
+    onComment: {},
+    liked: {
+      select: { userId: true }
+    }
+
+  }
+
   setQuery () {
     if (this.comment.commentId) {
       this.basic = { ...this.basic, onComment: { connect: { id: this.comment.commentId } } }
@@ -40,69 +61,53 @@ class CommentData {
     }
 
     return this.basic
-    // const query = {
-    //   contents: this.comment.contents,
-    //   author: {
-    //     connect: { id: this.comment.authorId }
-    //   },
-    //   // onPost: {
-    //   //   connect: { id: this.comment.postId }
-    //   // },
-    //   // onComment: {},
-    //   media: {}
-    // }
-
-    // if (this.comment.mediaType) {
-    //   query.media = {
-    //     create: {
-    //       type: this.comment.mediaType,
-    //       url: this.comment.fileKey
-    //     }
-    //   }
-    // }
-
-    // if (this.comment.commentId) {
-    //   query.onComment = {
-    //     connect: { id: this.comment.commentId }
-    //   }
-    // } else {
-    //   query.onPost = {
-    //     connect: { id: this.comment.postId }
-    //   }
-    // }
-    // return query
   }
 
-  // include()
+  setJoin () {
+    if (this.comment.commentId) {
+      this.join.onComment = { select: { authorId: true } }
+    } else {
+      this.join.onPost = { select: { authorId: true } }
+    }
+
+    return this.join
+  }
 }
 
 async function createComment (comment: { [key: string]: string }) {
   try {
+    const commentData = new CommentData(comment)
     const result = await prisma.comment.create({
-      data: new CommentData(comment).setQuery(),
-      include: {
-        author: {
-          select: {
-            name: true,
-            alias: true,
-            avatar: {
-              select: { url: true }
-            }
-          }
-        },
-        // onPost: {
-        //   select: { authorId: true }
-        // },
-        liked: {
-          select: { userId: true }
-        }
-      }
+      data: commentData.setQuery(),
+      include: commentData.setJoin()
     })
     prisma.$disconnect()
     return result
   } catch (err) {
     console.log(err)
     prisma.$disconnect()
+  }
+}
+
+async function getComment (commentId: string) {
+  try {
+    const comment = await prisma.comment.findUnique({
+      where: { id: commentId },
+      include: {
+        author: {
+          include: {
+            avatar: { select: { url: true } }
+          }
+        },
+        liked: true
+      }
+    })
+
+    await prisma.$disconnect()
+    return comment
+  } catch (err) {
+    await prisma.$disconnect()
+    console.error(err)
   }
 }
 
@@ -175,6 +180,7 @@ async function deleteLikeComment (likeCommentInfo: { [key: string]: string }) {
 }
 
 export {
+  getComment,
   getAttatchComments,
   createComment,
   createLikeComment,

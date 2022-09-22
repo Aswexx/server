@@ -12,6 +12,25 @@ enum NotifType {
   mention = 'mention'
 }
 
+async function getNotifs (userId: string) {
+  try {
+    const result = await prisma.notification.findMany({
+      where: { receiverId: userId },
+      include: {
+        informer: {
+          select: { name: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+    await prisma.$disconnect()
+    return result
+  } catch (err) {
+    await prisma.$disconnect()
+    console.error(err)
+  }
+}
+
 async function createNotif (notifData: {[key: string]: string, notifType: NotifType}) {
   try {
     const result = await prisma.notification.create({
@@ -36,6 +55,7 @@ async function createNotif (notifData: {[key: string]: string, notifType: NotifT
 }
 
 export {
+  getNotifs,
   createNotif,
   NotifType
 }

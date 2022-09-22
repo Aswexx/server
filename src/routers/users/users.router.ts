@@ -1,9 +1,11 @@
 import express from 'express'
+import { uploadProfileImages } from '../../util/multer'
 // import { setMaxAgeCache } from '../../util/cache-control'
 import {
   httpCreateUser,
   httpGetPopUsers,
   httpGetUser,
+  httpUpdateUser,
   httpGetGoolgeUser,
   httpLogout,
   httpAddUserFollowShip,
@@ -14,6 +16,8 @@ const usersRouter = express.Router()
 
 usersRouter.get('/popular/:userId', httpGetPopUsers)
 usersRouter.get('/:userId', httpGetUser)
+usersRouter.patch('/:userId', uploadProfileImages, httpUpdateUser)
+
 // *includs authenticate refresh token
 usersRouter.post('/google', httpGetGoolgeUser)
 usersRouter.post('/normal', httpGetUser)

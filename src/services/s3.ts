@@ -42,7 +42,6 @@ async function addNewFileToS3 (file: Savable): Promise<string> {
     Body: file.Body,
     ContentType: file.ContentType
   }
-  console.log(params)
   const command = new PutObjectCommand(params)
 
   const result = await s3.send(command)

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import {
   getAttatchComments,
+  getComment,
   createComment,
   createLikeComment,
   deleteLikeComment
@@ -24,21 +25,35 @@ async function httpCreatComment (req: Request, res: Response) {
 
   const result = await createComment(newComment)
   // TODO: set notif
-  // if (result) {
-  //   const notif = await createNotif({
-  //     receiverId: result.onPost.authorId,
-  //     informerId: result.authorId,
-  //     targetPostId: result.postId,
-  //     notifType: NotifType.replyPost
-  //   })
-  //   interactEE.emit(NotifType.replyPost, notif)
-  // }
+  console.log('❤️', result)
+  if (result && result.onPost && result.postId) {
+    const notif = await createNotif({
+      receiverId: result.onPost.authorId,
+      informerId: result.authorId,
+      targetPostId: result.postId,
+      notifType: NotifType.replyPost
+    })
+    interactEE.emit(NotifType.replyPost, notif)
+  } else if (result && result.onComment && result.onCommentId) {
+    const notif = await createNotif({
+      receiverId: result.onComment.authorId,
+      informerId: result.authorId,
+      targetCommentId: result.onCommentId,
+      notifType: NotifType.replyComment
+    })
+    interactEE.emit(NotifType.replyComment, notif)
+  }
+  res.json(result)
+}
+
+async function httpGetComment (req: Request, res: Response) {
+  const { commentId } = req.params
+  const result = await getComment(commentId)
   res.json(result)
 }
 
 async function httpGetAttatchComments (req: Request, res: Response) {
   const { commentId } = req.params
-  console.log(commentId)
   const result = await getAttatchComments(commentId)
   res.json(result)
 }
@@ -66,6 +81,7 @@ async function httpUpdateLikeComment (req: Request, res: Response) {
 
 export {
   httpGetAttatchComments,
+  httpGetComment,
   httpCreatComment,
   httpUpdateLikeComment
 }

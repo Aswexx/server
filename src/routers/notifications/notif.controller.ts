@@ -1,6 +1,12 @@
 import { Request, Response } from 'express'
-import { createNotif } from '../../models/notif.model'
+import { createNotif, getNotifs } from '../../models/notif.model'
 import { interactEE } from '../../notificationSocket'
+
+async function httpGetNotifs (req: Request, res: Response) {
+  const { userId } = req.params
+  const result = await getNotifs(userId)
+  res.json(result)
+}
 
 async function httpCreatNotif (req: Request, res: Response) {
   const result = await createNotif(req.body)
@@ -11,5 +17,6 @@ async function httpCreatNotif (req: Request, res: Response) {
 }
 
 export {
+  httpGetNotifs,
   httpCreatNotif
 }

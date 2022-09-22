@@ -55,6 +55,25 @@ async function createUser (data: registerData) {
   }
 }
 
+async function updateUser (infoToUpdate: { alias: string, userId: string, fileKeys: string[]}) {
+  try {
+    const result = await prisma.user.update({
+      where: { id: infoToUpdate.userId },
+      data: {
+        alias: infoToUpdate.alias,
+        bgImage: { create: { url: infoToUpdate.fileKeys[0] } },
+        avatar: { create: { url: infoToUpdate.fileKeys[1] } }
+      }
+    })
+
+    await prisma.$disconnect()
+    return result
+  } catch (err) {
+    await prisma.$disconnect()
+    console.error(err)
+  }
+}
+
 async function upsertUser (data: UserData) {
   try {
     const { id, name, email, avatar } = data
@@ -274,19 +293,10 @@ async function getPopUsers (userId: string) {
 export {
   upsertUser,
   createUser,
+  updateUser,
   getUser,
   getGoogleUser,
   getPopUsers,
   addUserFollowShip,
   deleteUserFollowShip
 }
-
-// main()
-//   .then(async () => {
-//     await prisma.$disconnect()
-//   })
-//   .catch(async (e) => {
-//     console.error(e)
-//     await prisma.$disconnect()
-//     process.exit(1)
-//   })

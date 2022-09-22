@@ -46,7 +46,7 @@ async function httpGetPost (req: Request, res: Response) {
   res.json(result)
 }
 
-async function httpCreatPost (req: Request, res: Response) {
+async function httpCreatePost (req: Request, res: Response) {
   const newPost = req.body
   const file = {
     Body: req.file?.buffer,
@@ -96,7 +96,7 @@ export {
   httpGetPosts,
   httpGetUserPosts,
   httpGetPost,
-  httpCreatPost,
+  httpCreatePost,
   httpUpdateLikePost,
   httpDeletePost
 }

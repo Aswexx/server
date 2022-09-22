@@ -12,6 +12,7 @@ function notificationSocket (io: Server) {
     let followHandler: (notif: { [key: string]: string | { name: string } }) => void
     let inviteChatHandler: (notif: { [key: string]: string }) => void
     let replyPostHandler: (notif: { [key: string]: string }) => void
+    let replyCommentHandler: (notif: { [key: string]: string }) => void
     let likePostHandler: (notif: { [key: string]: string }) => void
     let likeCommentHandler: (notif: { [key: string]: string }) => void
 
@@ -33,6 +34,11 @@ function notificationSocket (io: Server) {
         notification.in(listeningUserId).emit('notification', notif)
       }
 
+      replyCommentHandler = (notif) => {
+        if (listeningUserId !== notif.receiverId) return
+        notification.in(listeningUserId).emit('notification', notif)
+      }
+
       likePostHandler = (notif) => {
         if (listeningUserId !== notif.receiverId) return
         notification.in(listeningUserId).emit('notification', notif)
@@ -46,6 +52,7 @@ function notificationSocket (io: Server) {
       interactEE.on('follow', followHandler)
       interactEE.on('inviteChat', inviteChatHandler)
       interactEE.on('replyPost', replyPostHandler)
+      interactEE.on('replyComment', replyCommentHandler)
       interactEE.on('likePost', likePostHandler)
       interactEE.on('likeComment', likeCommentHandler)
 
@@ -59,6 +66,7 @@ function notificationSocket (io: Server) {
       interactEE.removeListener('follow', followHandler)
       interactEE.removeListener('inviteChat', inviteChatHandler)
       interactEE.removeListener('replyPost', replyPostHandler)
+      interactEE.removeListener('replyComment', replyCommentHandler)
       interactEE.removeListener('likePost', likePostHandler)
       interactEE.removeListener('likeComment', likeCommentHandler)
 

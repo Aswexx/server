@@ -1,8 +1,9 @@
-import { Request, Response } from 'express'
+import { Request, Response, Express } from 'express'
 import {
   // upsertUser,
   getUser,
   createUser,
+  updateUser,
   getPopUsers,
   addUserFollowShip,
   deleteUserFollowShip,
@@ -13,6 +14,7 @@ import { createNotif, NotifType } from '../../models/notif.model'
 import { hashSync } from '../../util/bcrypt'
 import { generateTokens, refreshTokenList } from '../../util/tokens'
 import { interactEE } from './../../notificationSocket'
+import { addNewFileToS3 } from '../../services/s3'
 
 async function httpCreateUser (req: Request, res: Response) {
   const userData = req.body
@@ -90,6 +92,34 @@ async function httpGetPopUsers (req: Request, res: Response) {
   res.json(result)
 }
 
+async function httpUpdateUser (req: Request, res: Response) {
+  const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined
+  const text = req.body
+  const { userId } = req.params
+  console.log('🚀 ~ file: users.controller.ts ~ line 99 ~ httpUpdateUser ~ userId', userId)
+
+  const fileKeysFromS3: string[] = []
+  if ((files && files.backgroundImage) || (files && files.avatarImage)) {
+    // * to S3
+    console.log('🔗TO S3~~~~~')
+    const imgKeys = Object.keys(files)
+    await Promise.all(imgKeys.map(async (key) => {
+      const file = {
+        Body: files[key][0].buffer,
+        ContentType: files[key][0].mimetype
+      }
+      const fileKey = await addNewFileToS3(file)
+      fileKeysFromS3.push(fileKey)
+    }))
+  }
+  const result = await updateUser({
+    userId,
+    alias: text.alias,
+    fileKeys: fileKeysFromS3
+  })
+  res.json(result)
+}
+
 async function httpGetGoolgeUser (req: Request, res: Response) {
   const { token } = req.body
   const user = await getGoogleUser(token)
@@ -120,6 +150,7 @@ export {
   httpCreateUser,
   httpGetUser,
   httpGetPopUsers,
+  httpUpdateUser,
   httpAddUserFollowShip,
   httpDeleteUserFollowShip,
   httpGetGoolgeUser,
