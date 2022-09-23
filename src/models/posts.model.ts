@@ -19,9 +19,7 @@ const postSelector = {
         select: {
           name: true,
           alias: true,
-          avatar: {
-            select: { url: true }
-          }
+          avatarUrl: true
         }
       },
       liked: {
@@ -34,9 +32,7 @@ const postSelector = {
       id: true,
       name: true,
       alias: true,
-      avatar: {
-        select: { url: true }
-      }
+      avatarUrl: true
     }
   }
 }
@@ -48,6 +44,12 @@ async function getPosts (cond: string, skip: number) {
       contents: true,
       createdAt: true,
       liked: true,
+      media: {
+        select: {
+          url: true,
+          type: true
+        }
+      },
       comments: {
         select: {
           id: true,
@@ -60,9 +62,7 @@ async function getPosts (cond: string, skip: number) {
             select: {
               name: true,
               alias: true,
-              avatar: {
-                select: { url: true }
-              }
+              avatarUrl: true
             }
           },
           liked: {
@@ -76,9 +76,7 @@ async function getPosts (cond: string, skip: number) {
           id: true,
           name: true,
           alias: true,
-          avatar: {
-            select: { url: true }
-          }
+          avatarUrl: true
         }
       }
     },

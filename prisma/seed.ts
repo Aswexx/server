@@ -1,9 +1,9 @@
 import { PrismaClient } from '@prisma/client'
-import { generateFakeUsers } from './seed.user'
+import { generateFakeUsersWithPosts } from './seed.user'
 const prisma = new PrismaClient()
 
 async function main () {
-  await generateFakeUsers()
+  await generateFakeUsersWithPosts(15, 20)
 }
 
 main()

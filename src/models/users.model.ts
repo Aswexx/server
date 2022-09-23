@@ -1,14 +1,15 @@
 import { PrismaClient } from '@prisma/client'
 import { compareSync } from '../util/bcrypt'
 import jwt from 'jsonwebtoken'
+import { getFileFromS3 } from '../services/s3'
 const prisma = new PrismaClient()
 
-interface UserData {
-  id: string
-  name: string
-  email: string
-  avatar: string
-}
+// interface UserData {
+//   id: string
+//   name: string
+//   email: string
+//   avatar: string
+// }
 
 interface registerData {
   [key: string]: string
@@ -32,17 +33,14 @@ async function createUser (data: registerData) {
         data: { loginEmail: email, password }
       })
     }
+
     const result = await prisma.user.create({
       data: {
         name,
         email,
         alias,
-        avatar: {
-          create: { url: picture || 'default_avatar1.png' }
-        },
-        bgImage: {
-          create: { url: 'default_bg1.jpg' }
-        }
+        avatarUrl: picture || '../assets/images/default-avatar.jpg',
+        bgImageUrl: '../assets/images/default-profile-bg.jpg'
       }
     })
 
@@ -55,16 +53,31 @@ async function createUser (data: registerData) {
   }
 }
 
-async function updateUser (infoToUpdate: { alias: string, userId: string, fileKeys: string[]}) {
+interface InfoToUpdate {
+  userId: string
+  alias?: string
+  bio?: string
+  fileKeys?: {
+    backgroundImageKey?: string
+    avatarKey?: string
+  }
+}
+
+async function updateUser (infoToUpdate: InfoToUpdate) {
   try {
-    const result = await prisma.user.update({
-      where: { id: infoToUpdate.userId },
-      data: {
-        alias: infoToUpdate.alias,
-        bgImage: { create: { url: infoToUpdate.fileKeys[0] } },
-        avatar: { create: { url: infoToUpdate.fileKeys[1] } }
-      }
-    })
+    console.log('🗺️🗺️🗺️', infoToUpdate)
+    let result
+    if (infoToUpdate.fileKeys) {
+      result = await prisma.user.update({
+        where: { id: infoToUpdate.userId },
+        data: {
+          alias: infoToUpdate.alias,
+          bio: infoToUpdate.bio,
+          bgImageUrl: infoToUpdate.fileKeys.backgroundImageKey,
+          avatarUrl: infoToUpdate.fileKeys.avatarKey
+        }
+      })
+    }
 
     await prisma.$disconnect()
     return result
@@ -74,36 +87,36 @@ async function updateUser (infoToUpdate: { alias: string, userId: string, fileKe
   }
 }
 
-async function upsertUser (data: UserData) {
-  try {
-    const { id, name, email, avatar } = data
-    const alias = `${name}${getRandomString(4)}`
-    const user = await prisma.user.upsert({
-      where: { email },
-      update: {},
-      create: {
-        id,
-        name,
-        email,
-        alias,
-        avatar: {
-          create: { url: avatar }
-        },
-        bgImage: {
-          create: { url: 'default' }
-        }
-      }
-    })
+// async function upsertUser (data: UserData) {
+//   try {
+//     const { id, name, email, avatar } = data
+//     const alias = `${name}${getRandomString(4)}`
+//     const user = await prisma.user.upsert({
+//       where: { email },
+//       update: {},
+//       create: {
+//         id,
+//         name,
+//         email,
+//         alias,
+//         avatar: {
+//           create: { url: avatar }
+//         },
+//         bgImage: {
+//           create: { url: 'default' }
+//         }
+//       }
+//     })
 
-    await prisma.$disconnect()
+//     await prisma.$disconnect()
 
-    return user
-  } catch (err) {
-    console.log(err)
-    await prisma.$disconnect()
-    process.exit(1)
-  }
-}
+//     return user
+//   } catch (err) {
+//     console.log(err)
+//     await prisma.$disconnect()
+//     process.exit(1)
+//   }
+// }
 
 interface FollowRelation {
   followerId: string
@@ -157,8 +170,6 @@ async function getUser (userState: UserState, loginInfo?: NormalLoginInfo) {
       return await prisma.user.findFirst({
         where: { id: userState.id },
         include: {
-          avatar: { select: { url: true } },
-          bgImage: { select: { url: true } },
           follow: {
             where: { followerId: userState.id }
           },
@@ -185,8 +196,6 @@ async function getUser (userState: UserState, loginInfo?: NormalLoginInfo) {
       const user = await prisma.user.findFirst({
         where: { email: account },
         include: {
-          avatar: { select: { url: true } },
-          bgImage: { select: { url: true } },
           follow: {
             select: { follower: true }
           },
@@ -197,6 +206,21 @@ async function getUser (userState: UserState, loginInfo?: NormalLoginInfo) {
       })
 
       await prisma.$disconnect()
+      // * 以是否直接放http url 區分假帳號與真實創建，後者需要再把 s3 key 轉成暫時性 url
+      if (user && !/^https/.exec(user.avatarUrl)) {
+        // user.bgImageUrl = await getFileFromS3(user.bgImageUrl)
+        // user.avatarUrl = await getFileFromS3(user.avatarUrl)
+        const urls = await Promise.all(
+          [
+            await getFileFromS3(user.bgImageUrl),
+            await getFileFromS3(user.avatarUrl)
+          ]
+        )
+        user.bgImageUrl = urls[0]
+        user.avatarUrl = urls[1]
+        // console.log('🔗', user.avatarUrl, user.bgImageUrl)
+        console.log('🔗', urls)
+      }
       return user
     }
     //* Dev login
@@ -205,8 +229,6 @@ async function getUser (userState: UserState, loginInfo?: NormalLoginInfo) {
       const user = await prisma.user.findFirst({
         where: { id: devUser },
         include: {
-          avatar: { select: { url: true } },
-          bgImage: { select: { url: true } },
           follow: {
             select: { follower: true }
           },
@@ -236,8 +258,6 @@ async function getGoogleUser (token: string) {
     const user = await prisma.user.findFirst({
       where: { email },
       include: {
-        avatar: { select: { url: true } },
-        bgImage: { select: { url: true } },
         follow: {
           select: { follower: true }
         },
@@ -272,10 +292,8 @@ async function getPopUsers (userId: string) {
       select: {
         id: true,
         name: true,
+        avatarUrl: true,
         alias: true,
-        avatar: {
-          select: { url: true }
-        },
         followed: true
       },
       take: 10
@@ -291,7 +309,6 @@ async function getPopUsers (userId: string) {
 }
 
 export {
-  upsertUser,
   createUser,
   updateUser,
   getUser,

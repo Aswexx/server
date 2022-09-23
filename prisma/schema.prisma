@@ -30,11 +30,13 @@ model User {
   role  Role    @default(normal)
   bio   String?
 
-  avatar    ProfileImage? @relation("avatar", fields: [avatarUrl], references: [id])
-  avatarUrl String        @unique @map("avatar_url")
+  // avatar    ProfileImage? @relation("avatar", fields: [avatarUrl], references: [id])
+  // avatarUrl String        @unique @map("avatar_url")
 
-  bgImage    ProfileImage? @relation("bgImage", fields: [bgImageUrl], references: [id])
-  bgImageUrl String        @unique @map("bg_image_url")
+  // bgImage    ProfileImage? @relation("bgImage", fields: [bgImageUrl], references: [id])
+  // bgImageUrl String        @unique @map("bg_image_url")
+  avatarUrl  String @unique
+  bgImageUrl String @unique
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @map("updated_at")
@@ -143,16 +145,16 @@ model FollowingShip {
   @@map("following_ships")
 }
 
-model ProfileImage {
-  id        String   @id @default(uuid()) @db.Char(36)
-  url       String
-  createdAt DateTime @default(now()) @map("created_at")
+// model ProfileImage {
+//   id        String   @id @default(uuid()) @db.Char(36)
+//   url       String
+//   createdAt DateTime @default(now()) @map("created_at")
 
-  avatarUser  User? @relation("avatar")
-  bgImageUser User? @relation("bgImage")
+//   avatarUser  User? @relation("avatar")
+//   bgImageUser User? @relation("bgImage")
 
-  @@map("profile_images")
-}
+//   @@map("profile_images")
+// }
 
 model MediaFile {
   id        String   @id @default(uuid()) @db.Char(36)

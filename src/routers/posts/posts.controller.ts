@@ -17,19 +17,44 @@ async function httpGetPosts (req: Request, res: Response) {
 
   const results = await getPosts('newestTen', Number(skipPostsCount))
 
-  for (const post of results) {
-    if (post.comments) {
+  // for (const post of results) {
+  //   if (post.comments.length) {
+  //     for (const comment of post.comments) {
+  //       if (comment.media && comment.media.url) {
+  //         const imageKey = comment.media.url
+  //         console.log('🧨🧨', imageKey)
+  //         comment.media.url = await getFileFromS3(imageKey)
+  //       }
+  //     }
+  //   }
+  // }
+
+  // if (!/^https/.exec(post.author.avatarUrl)) {
+  //   post.author.avatarUrl = await getFileFromS3(post.author.avatarUrl)
+  //   const mapResults = await Promise.all()
+  // }
+
+  const mapResults = await Promise.all(results.map(async (post) => {
+    if (post.media) {
+      post.media.url = await getFileFromS3(post.media.url)
+    }
+
+    if (post.comments.length) {
       for (const comment of post.comments) {
         if (comment.media && comment.media.url) {
-          const imageKey = comment.media.url
-          console.log('🧨🧨', imageKey)
-          comment.media.url = await getFileFromS3(imageKey)
+          comment.media.url = await getFileFromS3(comment.media.url)
         }
       }
     }
-  }
 
-  res.json(results)
+    if (!/^https/.exec(post.author.avatarUrl)) {
+      post.author.avatarUrl = await getFileFromS3(post.author.avatarUrl)
+    }
+
+    return post
+  }))
+
+  res.json(mapResults)
 }
 
 async function httpGetUserPosts (req: Request, res: Response) {

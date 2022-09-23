@@ -96,26 +96,48 @@ async function httpUpdateUser (req: Request, res: Response) {
   const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined
   const text = req.body
   const { userId } = req.params
-  console.log('🚀 ~ file: users.controller.ts ~ line 99 ~ httpUpdateUser ~ userId', userId)
 
-  const fileKeysFromS3: string[] = []
+  let s3FileKeys: {backgroundImageKey?: string, avatarKey?: string} = {}
   if ((files && files.backgroundImage) || (files && files.avatarImage)) {
-    // * to S3
-    console.log('🔗TO S3~~~~~')
-    const imgKeys = Object.keys(files)
-    await Promise.all(imgKeys.map(async (key) => {
+    if (!files.backgroundImage) {
       const file = {
-        Body: files[key][0].buffer,
-        ContentType: files[key][0].mimetype
+        Body: files.avatarImage[0].buffer,
+        ContentType: files.avatarImage[0].mimetype
       }
-      const fileKey = await addNewFileToS3(file)
-      fileKeysFromS3.push(fileKey)
-    }))
+      const avatarKey = await addNewFileToS3(file)
+      s3FileKeys.avatarKey = avatarKey
+    } else if (!files.avatarImage) {
+      const file = {
+        Body: files.backgroundImage[0].buffer,
+        ContentType: files.backgroundImage[0].mimetype
+      }
+      const backgroundImageKey = await addNewFileToS3(file)
+      s3FileKeys.backgroundImageKey = backgroundImageKey
+    } else {
+      const imageProps = Object.keys(files)
+      const promises = await Promise.all(imageProps.map(async (prop) => {
+        const file = {
+          Body: files[prop][0].buffer,
+          ContentType: files[prop][0].mimetype
+        }
+        return await addNewFileToS3(file)
+      }))
+
+      s3FileKeys = {
+        backgroundImageKey: promises[0],
+        avatarKey: promises[1]
+      }
+    }
   }
+  console.log('⭕⭕', s3FileKeys)
   const result = await updateUser({
     userId,
     alias: text.alias,
-    fileKeys: fileKeysFromS3
+    bio: text.bio,
+    fileKeys: {
+      backgroundImageKey: s3FileKeys.backgroundImageKey,
+      avatarKey: s3FileKeys.avatarKey
+    }
   })
   res.json(result)
 }

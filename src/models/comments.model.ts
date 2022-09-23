@@ -95,9 +95,7 @@ async function getComment (commentId: string) {
       where: { id: commentId },
       include: {
         author: {
-          include: {
-            avatar: { select: { url: true } }
-          }
+          select: { avatarUrl: true }
         },
         liked: true
       }
@@ -120,7 +118,7 @@ async function getAttatchComments (commentId: string) {
           select: {
             name: true,
             alias: true,
-            avatar: { select: { url: true } }
+            avatarUrl: true
           }
         },
         liked: {
