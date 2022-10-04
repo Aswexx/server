@@ -2,26 +2,46 @@ import { PrismaClient } from '@prisma/client'
 import { compareSync } from '../util/bcrypt'
 import jwt from 'jsonwebtoken'
 import { getFileFromS3 } from '../services/s3'
+import crypto from 'crypto'
 const prisma = new PrismaClient()
-
-// interface UserData {
-//   id: string
-//   name: string
-//   email: string
-//   avatar: string
-// }
 
 interface registerData {
   [key: string]: string
 }
 
-interface NormalLoginInfo {
+interface LoginInfo {
   account: string
   password: string
 }
 
 function getRandomString (randomBytes: number): string {
   return require('crypto').randomBytes(randomBytes).toString('hex')
+}
+
+async function getUsers () {
+  try {
+    const result = await prisma.user.findMany({
+      where: { role: 'normal' },
+      include: {
+        _count: {
+          select: {
+            follow: true,
+            followed: true,
+            posts: true
+          }
+        },
+        posts: {
+          select: {
+            liked: true
+          }
+        }
+      }
+    })
+    return result
+  } catch (err) {
+    await prisma.$disconnect()
+    console.log(err)
+  }
 }
 
 async function createUser (data: registerData) {
@@ -34,13 +54,14 @@ async function createUser (data: registerData) {
       })
     }
 
+    // TODO: fix default images
     const result = await prisma.user.create({
       data: {
         name,
         email,
         alias,
-        avatarUrl: picture || '../assets/images/default-avatar.jpg',
-        bgImageUrl: '../assets/images/default-profile-bg.jpg'
+        avatarUrl: picture || crypto.randomBytes(16).toString('hex'),
+        bgImageUrl: crypto.randomBytes(16).toString('hex')
       }
     })
 
@@ -49,7 +70,6 @@ async function createUser (data: registerData) {
   } catch (err) {
     await prisma.$disconnect()
     console.log(err)
-    process.exit(1)
   }
 }
 
@@ -86,37 +106,6 @@ async function updateUser (infoToUpdate: InfoToUpdate) {
     console.error(err)
   }
 }
-
-// async function upsertUser (data: UserData) {
-//   try {
-//     const { id, name, email, avatar } = data
-//     const alias = `${name}${getRandomString(4)}`
-//     const user = await prisma.user.upsert({
-//       where: { email },
-//       update: {},
-//       create: {
-//         id,
-//         name,
-//         email,
-//         alias,
-//         avatar: {
-//           create: { url: avatar }
-//         },
-//         bgImage: {
-//           create: { url: 'default' }
-//         }
-//       }
-//     })
-
-//     await prisma.$disconnect()
-
-//     return user
-//   } catch (err) {
-//     console.log(err)
-//     await prisma.$disconnect()
-//     process.exit(1)
-//   }
-// }
 
 interface FollowRelation {
   followerId: string
@@ -164,11 +153,13 @@ interface UserState {
   isLoginUser: boolean
 }
 
-async function getUser (userState: UserState, loginInfo?: NormalLoginInfo) {
+async function getUser (userState: UserState, loginInfo?: LoginInfo) {
   try {
     if (!userState.isLoginUser) {
       return await prisma.user.findFirst({
-        where: { id: userState.id },
+        where: {
+          id: userState.id
+        },
         include: {
           follow: {
             where: { followerId: userState.id }
@@ -180,69 +171,50 @@ async function getUser (userState: UserState, loginInfo?: NormalLoginInfo) {
       })
     }
 
-    const { account, password } = loginInfo as NormalLoginInfo
+    const { account, password } = loginInfo as LoginInfo
 
-    if (account !== 'dev123') {
-      const hash = await prisma.loginInfo.findUnique({
-        where: { loginEmail: account },
-        select: { password: true }
-      })
+    const hash = await prisma.loginInfo.findUnique({
+      where: { loginEmail: account },
+      select: { password: true }
+    })
 
-      if (!hash) throw new Error('Data not found')
-      if (!compareSync(password, hash.password)) {
-        return ''
-      }
-
-      const user = await prisma.user.findFirst({
-        where: { email: account },
-        include: {
-          follow: {
-            select: { follower: true }
-          },
-          followed: {
-            select: { followedId: true }
-          }
-        }
-      })
-
-      await prisma.$disconnect()
-      // * 以是否直接放http url 區分假帳號與真實創建，後者需要再把 s3 key 轉成暫時性 url
-      if (user && !/^https/.exec(user.avatarUrl)) {
-        // user.bgImageUrl = await getFileFromS3(user.bgImageUrl)
-        // user.avatarUrl = await getFileFromS3(user.avatarUrl)
-        const urls = await Promise.all(
-          [
-            await getFileFromS3(user.bgImageUrl),
-            await getFileFromS3(user.avatarUrl)
-          ]
-        )
-        user.bgImageUrl = urls[0]
-        user.avatarUrl = urls[1]
-        // console.log('🔗', user.avatarUrl, user.bgImageUrl)
-        console.log('🔗', urls)
-      }
-      return user
-    }
-    //* Dev login
-    const devUser = '3750f2af-1a10-4727-b9c9-6027dd8007d4'
-    if (account === 'dev123' && password === '123') {
-      const user = await prisma.user.findFirst({
-        where: { id: devUser },
-        include: {
-          follow: {
-            select: { follower: true }
-          },
-          followed: {
-            select: { followedId: true }
-          }
-        }
-      })
-
-      await prisma.$disconnect()
-      return user
-    } else {
+    if (!hash) throw new Error('Data not found')
+    if (!compareSync(password, hash.password)) {
       return ''
     }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        email: account,
+        role: 'normal'
+      },
+      include: {
+        follow: {
+          select: { follower: true }
+        },
+        followed: {
+          select: { followedId: true }
+        }
+      }
+    })
+
+    await prisma.$disconnect()
+    // * 以是否直接放http url 區分假帳號與真實創建，後者需要再把 s3 key 轉成暫時性 url
+    if (user && !/^https/.exec(user.avatarUrl)) {
+      // user.bgImageUrl = await getFileFromS3(user.bgImageUrl)
+      // user.avatarUrl = await getFileFromS3(user.avatarUrl)
+      const urls = await Promise.all(
+        [
+          await getFileFromS3(user.bgImageUrl),
+          await getFileFromS3(user.avatarUrl)
+        ]
+      )
+      user.bgImageUrl = urls[0]
+      user.avatarUrl = urls[1]
+      // console.log('🔗', user.avatarUrl, user.bgImageUrl)
+      console.log('🔗', urls)
+    }
+    return user
   } catch (err) {
     console.log(err)
     await prisma.$disconnect()
@@ -304,7 +276,34 @@ async function getPopUsers (userId: string) {
   } catch (err) {
     console.log(err)
     await prisma.$disconnect()
-    process.exit(1)
+  }
+}
+
+async function getAdmin (loginInfo: LoginInfo) {
+  try {
+    const hash = await prisma.loginInfo.findFirst({
+      where: { loginEmail: loginInfo.account },
+      select: { password: true }
+    })
+
+    if (!hash) throw new Error('Data not found')
+    if (!compareSync(loginInfo.password, hash.password)) {
+      console.log('INVALID')
+      return ''
+    }
+
+    const admin = await prisma.user.findFirst({
+      where: {
+        email: loginInfo.account,
+        role: 'admin'
+      }
+    })
+
+    await prisma.$disconnect()
+    return admin
+  } catch (err) {
+    await prisma.$disconnect()
+    console.error(err)
   }
 }
 
@@ -312,7 +311,9 @@ export {
   createUser,
   updateUser,
   getUser,
+  getUsers,
   getGoogleUser,
+  getAdmin,
   getPopUsers,
   addUserFollowShip,
   deleteUserFollowShip

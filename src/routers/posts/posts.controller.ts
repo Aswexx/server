@@ -3,6 +3,8 @@ import {
   getPost,
   getPosts,
   getUserPosts,
+  getPostsByMostComments,
+  getPostsByMostLiked,
   createPost,
   createLikePost,
   deleteLikePost,
@@ -13,28 +15,17 @@ import { interactEE } from '../../notificationSocket'
 import { addNewFileToS3, getFileFromS3 } from '../../services/s3'
 
 async function httpGetPosts (req: Request, res: Response) {
-  const { skipPostsCount } = req.query
+  const { skipPostsCount, take, order } = req.query
+  let results
+  if (!/most/.exec(order as string)) {
+    results = await getPosts(Number(skipPostsCount), Number(take), order as string)
+  } else if (order === 'mostComments') {
+    results = await getPostsByMostComments(Number(skipPostsCount), Number(take))
+  } else {
+    results = await getPostsByMostLiked(Number(skipPostsCount), Number(take))
+  }
 
-  const results = await getPosts('newestTen', Number(skipPostsCount))
-
-  // for (const post of results) {
-  //   if (post.comments.length) {
-  //     for (const comment of post.comments) {
-  //       if (comment.media && comment.media.url) {
-  //         const imageKey = comment.media.url
-  //         console.log('🧨🧨', imageKey)
-  //         comment.media.url = await getFileFromS3(imageKey)
-  //       }
-  //     }
-  //   }
-  // }
-
-  // if (!/^https/.exec(post.author.avatarUrl)) {
-  //   post.author.avatarUrl = await getFileFromS3(post.author.avatarUrl)
-  //   const mapResults = await Promise.all()
-  // }
-
-  const mapResults = await Promise.all(results.map(async (post) => {
+  const mapResults = await Promise.all(results.posts.map(async (post) => {
     if (post.media) {
       post.media.url = await getFileFromS3(post.media.url)
     }
@@ -53,8 +44,8 @@ async function httpGetPosts (req: Request, res: Response) {
 
     return post
   }))
-
-  res.json(mapResults)
+  console.log(results.postCount)
+  res.json({ ...mapResults, postCount: results.postCount })
 }
 
 async function httpGetUserPosts (req: Request, res: Response) {

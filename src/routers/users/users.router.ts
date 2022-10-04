@@ -5,9 +5,11 @@ import {
   httpCreateUser,
   httpGetPopUsers,
   httpGetUser,
+  httpGetAdmin,
   httpUpdateUser,
   httpGetGoolgeUser,
   httpLogout,
+  httpGetUsers,
   httpAddUserFollowShip,
   httpDeleteUserFollowShip
 } from './users.controller'
@@ -21,8 +23,10 @@ usersRouter.patch('/:userId', uploadProfileImages, httpUpdateUser)
 // *includs authenticate refresh token
 usersRouter.post('/google', httpGetGoolgeUser)
 usersRouter.post('/normal', httpGetUser)
+usersRouter.post('/admin', httpGetAdmin)
 usersRouter.get('/logout', httpLogout)
 
+usersRouter.get('/', httpGetUsers)
 usersRouter.post('/', httpCreateUser)
 usersRouter.put('/', httpAddUserFollowShip)
 usersRouter.delete('/:followShipId', httpDeleteUserFollowShip)

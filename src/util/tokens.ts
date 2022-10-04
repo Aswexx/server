@@ -3,9 +3,9 @@ import jwt from 'jsonwebtoken'
 
 const refreshTokenList: string[] = [] // save to Redis
 const accessTokenExp: { expiresIn: number | string | undefined } =
-  { expiresIn: 15 }
+  { expiresIn: 30 * 60 }
 
-function generateTokens (userInfo: any) {
+function generateTokensThenSetCookie (userInfo: any, res: Response) {
   if (!process.env.REFRESH_TOKEN_SECRET ||
     !process.env.ACCESS_TOKEN_SECRET) throw new Error('env variable not defined')
 
@@ -13,7 +13,23 @@ function generateTokens (userInfo: any) {
   const refreshToken = jwt.sign(payload, process.env.REFRESH_TOKEN_SECRET)
   const accessToken = jwt.sign(payload, process.env.ACCESS_TOKEN_SECRET, accessTokenExp)
 
+  setCookieWithTokens(refreshToken, accessToken, res)
+  refreshTokenList.push(refreshToken)
+
   return { refreshToken, accessToken }
+}
+
+function setCookieWithTokens (refreshToken: string, accessToken: string, res: Response) {
+  console.log(refreshTokenList)
+  res.cookie('reToken', refreshToken, {
+    httpOnly: true,
+    secure: true
+  })
+
+  res.cookie('acToken', accessToken, {
+    httpOnly: true,
+    secure: true
+  })
 }
 
 // function isAuthenticated (req: Request, res: Response, next: NextFunction): void {
@@ -75,7 +91,7 @@ function tokenRefresh (refreshToken: string, res: Response) {
 }
 
 export {
-  generateTokens,
+  generateTokensThenSetCookie,
   authenticateToken,
   refreshTokenList
   // isAuthenticated

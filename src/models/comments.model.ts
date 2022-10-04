@@ -2,15 +2,6 @@
 import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
-// interface Comment {
-//   authorId: string
-//   postId: string
-//   commentId?: string
-//   contents: string
-//   fileKey?: string
-//   mediaType?: string
-// }
-
 class CommentData {
   constructor (public comment: { [key: string]: string }) { }
   basic = {
@@ -28,20 +19,14 @@ class CommentData {
       select: {
         name: true,
         alias: true,
-        avatar: {
-          select: { url: true }
-        }
+        avatarUrl: true
       }
     },
-    // onPost: {
-    //   select: { authorId: true }
-    // },
     onPost: {},
     onComment: {},
     liked: {
       select: { userId: true }
     }
-
   }
 
   setQuery () {

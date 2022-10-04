@@ -2,6 +2,8 @@ import { Request, Response, Express } from 'express'
 import {
   // upsertUser,
   getUser,
+  getUsers,
+  getAdmin,
   createUser,
   updateUser,
   getPopUsers,
@@ -12,9 +14,14 @@ import {
 import { createNotif, NotifType } from '../../models/notif.model'
 // import { sendMail } from '../../services/gmail'
 import { hashSync } from '../../util/bcrypt'
-import { generateTokens, refreshTokenList } from '../../util/tokens'
+import { generateTokensThenSetCookie, refreshTokenList } from '../../util/tokens'
 import { interactEE } from './../../notificationSocket'
 import { addNewFileToS3 } from '../../services/s3'
+
+async function httpGetUsers (req: Request, res: Response) {
+  const result = await getUsers()
+  res.json(result)
+}
 
 async function httpCreateUser (req: Request, res: Response) {
   const userData = req.body
@@ -70,18 +77,7 @@ async function httpGetUser (req: Request, res: Response) {
   if (!result) {
     return res.json(result)
   }
-  const tokens = generateTokens(result)
-  refreshTokenList.push(tokens.refreshToken)
-  console.log(refreshTokenList)
-  res.cookie('reToken', tokens.refreshToken, {
-    httpOnly: true,
-    secure: true
-  })
-
-  res.cookie('acToken', tokens.accessToken, {
-    httpOnly: true,
-    secure: true
-  })
+  generateTokensThenSetCookie(result, res)
   res.json(result)
 }
 
@@ -145,7 +141,7 @@ async function httpUpdateUser (req: Request, res: Response) {
 async function httpGetGoolgeUser (req: Request, res: Response) {
   const { token } = req.body
   const user = await getGoogleUser(token)
-  const tokens = generateTokens(user)
+  const tokens = generateTokensThenSetCookie(user, res)
 
   refreshTokenList.push(tokens.refreshToken)
   console.log(refreshTokenList)
@@ -162,6 +158,19 @@ async function httpGetGoolgeUser (req: Request, res: Response) {
   res.json(user)
 }
 
+async function httpGetAdmin (req: Request, res: Response) {
+  const { account, password } = req.body
+  console.log({ account, password })
+  const result = await getAdmin({ account, password })
+  if (!result) {
+    return res.sendStatus(401)
+  }
+
+  generateTokensThenSetCookie(result, res)
+
+  res.json(result)
+}
+
 function httpLogout () {
   // TODO: clean token session
   console.log('logout')
@@ -170,7 +179,9 @@ function httpLogout () {
 export {
   httpUpsertUser,
   httpCreateUser,
+  httpGetUsers,
   httpGetUser,
+  httpGetAdmin,
   httpGetPopUsers,
   httpUpdateUser,
   httpAddUserFollowShip,

@@ -37,8 +37,18 @@ const postSelector = {
   }
 }
 
-async function getPosts (cond: string, skip: number) {
-  const result = await prisma.post.findMany({
+// TODO: try abstract
+
+async function getPosts (skip: number, take: number, order: string) {
+  console.log('😅😅', skip, take, order)
+  const postCount = await prisma.post.count()
+
+  const orderRule =
+    order === 'newest'
+      ? 'desc'
+      : 'asc'
+
+  const posts = await prisma.post.findMany({
     select: {
       id: true,
       contents: true,
@@ -80,12 +90,118 @@ async function getPosts (cond: string, skip: number) {
         }
       }
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { createdAt: orderRule },
     skip,
-    take: 10
+    take
   })
 
-  return result
+  return { posts, postCount }
+}
+
+async function getPostsByMostComments (skip: number, take: number) {
+  const postCount = await prisma.post.count()
+
+  const posts = await prisma.post.findMany({
+    select: {
+      id: true,
+      contents: true,
+      createdAt: true,
+      liked: true,
+      media: {
+        select: {
+          url: true,
+          type: true
+        }
+      },
+      comments: {
+        select: {
+          id: true,
+          contents: true,
+          createdAt: true,
+          media: {
+            select: { url: true, type: true }
+          },
+          author: {
+            select: {
+              name: true,
+              alias: true,
+              avatarUrl: true
+            }
+          },
+          liked: {
+            select: { userId: true }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      },
+      author: {
+        select: {
+          id: true,
+          name: true,
+          alias: true,
+          avatarUrl: true
+        }
+      }
+    },
+    skip,
+    take,
+    orderBy: { comments: { _count: 'desc' } }
+  })
+
+  return { posts, postCount }
+}
+
+async function getPostsByMostLiked (skip: number, take: number) {
+  const postCount = await prisma.post.count()
+
+  const posts = await prisma.post.findMany({
+    select: {
+      id: true,
+      contents: true,
+      createdAt: true,
+      liked: true,
+      media: {
+        select: {
+          url: true,
+          type: true
+        }
+      },
+      comments: {
+        select: {
+          id: true,
+          contents: true,
+          createdAt: true,
+          media: {
+            select: { url: true, type: true }
+          },
+          author: {
+            select: {
+              name: true,
+              alias: true,
+              avatarUrl: true
+            }
+          },
+          liked: {
+            select: { userId: true }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      },
+      author: {
+        select: {
+          id: true,
+          name: true,
+          alias: true,
+          avatarUrl: true
+        }
+      }
+    },
+    skip,
+    take,
+    orderBy: { liked: { _count: 'desc' } }
+  })
+
+  return { posts, postCount }
 }
 
 async function getUserPosts (userId: string, skip: number = 0) {
@@ -215,6 +331,8 @@ export {
   getPost,
   getPosts,
   getUserPosts,
+  getPostsByMostComments,
+  getPostsByMostLiked,
   createPost,
   createLikePost,
   deleteLikePost,

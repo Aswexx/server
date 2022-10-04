@@ -12,8 +12,9 @@ import {
 const postsRouter = express.Router()
 
 postsRouter.get('/recent/:userId', httpGetUserPosts)
-postsRouter.get('/relative-posts', httpGetPosts)
+postsRouter.get('/home-page', httpGetPosts)
 postsRouter.get('/:postId', httpGetPost)
+postsRouter.get('/', httpGetPosts)
 postsRouter.post('/', upload, httpCreatePost)
 postsRouter.put('/', httpUpdateLikePost)
 postsRouter.delete('/:postId', httpDeletePost)
