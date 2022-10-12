@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import {
   getAttatchComments,
+  getComments,
   getComment,
   createComment,
   createLikeComment,
@@ -8,7 +9,7 @@ import {
 } from '../../models/comments.model'
 import { createNotif, NotifType } from '../../models/notif.model'
 import { interactEE } from '../../notificationSocket'
-import { addNewFileToS3 } from '../../services/s3'
+import { addNewFileToS3, getFileFromS3 } from '../../services/s3'
 
 async function httpCreatComment (req: Request, res: Response) {
   const newComment = req.body
@@ -46,6 +47,19 @@ async function httpCreatComment (req: Request, res: Response) {
   res.json(result)
 }
 
+async function httpGetUserComments (req: Request, res: Response) {
+  const { userId } = req.params
+
+  const comments = await getComments(userId)
+  if (comments && comments.length) {
+    const avatarUrl = await getFileFromS3(comments[0].author.avatarUrl)
+    comments.forEach(comment => {
+      comment.author.avatarUrl = avatarUrl
+    })
+  }
+  res.json(comments)
+}
+
 async function httpGetComment (req: Request, res: Response) {
   const { commentId } = req.params
   const result = await getComment(commentId)
@@ -55,6 +69,8 @@ async function httpGetComment (req: Request, res: Response) {
 async function httpGetAttatchComments (req: Request, res: Response) {
   const { commentId } = req.params
   const result = await getAttatchComments(commentId)
+  console.log('🐶🐶🐶', result)
+
   res.json(result)
 }
 
@@ -81,6 +97,7 @@ async function httpUpdateLikeComment (req: Request, res: Response) {
 
 export {
   httpGetAttatchComments,
+  httpGetUserComments,
   httpGetComment,
   httpCreatComment,
   httpUpdateLikeComment

@@ -8,6 +8,7 @@ import { usersRouter } from './routers/users/users.router'
 import { postsRouter } from './routers/posts/posts.router'
 import { commentsRouter } from './routers/comments/comments.router'
 import { notifRouter } from './routers/notifications/notif.router'
+// import multer from 'multer'
 
 import cors from 'cors'
 import morgan from 'morgan'
@@ -50,6 +51,8 @@ app.use(passport.session())
 app.use(cookieParser())
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
+// // * parse multi-part form data which is text-only
+// app.use(multer().none())
 app.use('/test', express.static(path.join(__dirname, '..', 'public')))
 
 app.use('/users', usersRouter)

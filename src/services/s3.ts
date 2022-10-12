@@ -44,8 +44,7 @@ async function addNewFileToS3 (file: Savable): Promise<string> {
   }
   const command = new PutObjectCommand(params)
 
-  const result = await s3.send(command)
-  console.log('🚀 ~ file: s3.ts ~ line 38 ~ addNewFileToS3 ~ result', result)
+  await s3.send(command)
   return params.Key
 }
 
@@ -56,10 +55,8 @@ async function getFileFromS3 (fileKey: string): Promise<string> {
     Key: fileKey
   }
 
-  console.log('😂😅😅⭕⭕', params)
-
   const command = new GetObjectCommand(params)
-  return await getSignedUrl(s3, command)
+  return await getSignedUrl(s3, command, { expiresIn: 60 * 60 })
 }
 
 export {

@@ -30,13 +30,8 @@ model User {
   role  Role    @default(normal)
   bio   String?
 
-  // avatar    ProfileImage? @relation("avatar", fields: [avatarUrl], references: [id])
-  // avatarUrl String        @unique @map("avatar_url")
-
-  // bgImage    ProfileImage? @relation("bgImage", fields: [bgImageUrl], references: [id])
-  // bgImageUrl String        @unique @map("bg_image_url")
-  avatarUrl  String @unique
-  bgImageUrl String @unique
+  avatarUrl  String
+  bgImageUrl String
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @map("updated_at")

@@ -65,6 +65,16 @@ async function getPosts (skip: number, take: number, order: string) {
           id: true,
           contents: true,
           createdAt: true,
+          onPost: {
+            select: {
+              author: {
+                select: {
+                  name: true,
+                  alias: true
+                }
+              }
+            }
+          },
           media: {
             select: { url: true, type: true }
           },
@@ -96,6 +106,85 @@ async function getPosts (skip: number, take: number, order: string) {
   })
 
   return { posts, postCount }
+}
+
+async function getUserLikePosts (userId: string) {
+  try {
+    const posts = await prisma.likePost.findMany({
+      where: { userId },
+      include: {
+        post: {
+          include: {
+            author: { select: { alias: true, avatarUrl: true } },
+            liked: true,
+            comments: true
+          }
+        }
+      }
+    })
+
+    return posts
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+async function getPostsByKeyword (keyword: string) {
+  try {
+    const posts = await prisma.post.findMany({
+      where: {
+        contents: {
+          contains: keyword,
+          mode: 'insensitive'
+        }
+      },
+      select: {
+        id: true,
+        contents: true,
+        createdAt: true,
+        liked: true,
+        media: {
+          select: {
+            url: true,
+            type: true
+          }
+        },
+        comments: {
+          select: {
+            id: true,
+            contents: true,
+            createdAt: true,
+            media: {
+              select: { url: true, type: true }
+            },
+            author: {
+              select: {
+                name: true,
+                alias: true,
+                avatarUrl: true
+              }
+            },
+            liked: {
+              select: { userId: true }
+            }
+          }
+        },
+        author: {
+          select: {
+            id: true,
+            name: true,
+            alias: true,
+            avatarUrl: true
+          }
+        }
+      }
+    })
+    await prisma.$disconnect()
+    return { posts, postCount: posts.length }
+  } catch (err) {
+    console.error(err)
+    await prisma.$disconnect()
+  }
 }
 
 async function getPostsByMostComments (skip: number, take: number) {
@@ -215,6 +304,20 @@ async function getUserPosts (userId: string, skip: number = 0) {
   return result
 }
 
+async function getAllPostsCreatedAt () {
+  try {
+    const result = prisma.post.findMany({
+      select: { createdAt: true }
+    })
+
+    await prisma.$disconnect()
+    return result
+  } catch (err) {
+    console.error(err)
+    await prisma.$disconnect()
+  }
+}
+
 interface Post {
   authorId: string
   contents: string
@@ -330,9 +433,12 @@ async function deletePost (postId: string) {
 export {
   getPost,
   getPosts,
+  getUserLikePosts,
+  getPostsByKeyword,
   getUserPosts,
   getPostsByMostComments,
   getPostsByMostLiked,
+  getAllPostsCreatedAt,
   createPost,
   createLikePost,
   deleteLikePost,

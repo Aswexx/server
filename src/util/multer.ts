@@ -1,6 +1,7 @@
 import multer from 'multer'
 
 const storage = multer.memoryStorage()
+export const parseFormDataText = multer().none()
 export const upload = multer({ storage }).single('file')
 export const uploadProfileImages =
   multer({ storage, limits: { fileSize: 1 * 1024 * 1024 } }).fields([{

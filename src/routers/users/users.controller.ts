@@ -1,12 +1,12 @@
 import { Request, Response, Express } from 'express'
 import {
-  // upsertUser,
   getUser,
+  findUniqueUser,
   getUsers,
   getAdmin,
   createUser,
   updateUser,
-  getPopUsers,
+  // getPopUsers,
   addUserFollowShip,
   deleteUserFollowShip,
   getGoogleUser
@@ -16,7 +16,7 @@ import { createNotif, NotifType } from '../../models/notif.model'
 import { hashSync } from '../../util/bcrypt'
 import { generateTokensThenSetCookie, refreshTokenList } from '../../util/tokens'
 import { interactEE } from './../../notificationSocket'
-import { addNewFileToS3 } from '../../services/s3'
+import { addNewFileToS3, getFileFromS3 } from '../../services/s3'
 
 async function httpGetUsers (req: Request, res: Response) {
   const result = await getUsers()
@@ -26,22 +26,18 @@ async function httpGetUsers (req: Request, res: Response) {
 async function httpCreateUser (req: Request, res: Response) {
   const userData = req.body
 
-  // TODO: validate email availbility
-  // TODO: validate unique infos
+  const isRegistered = await findUniqueUser({
+    email: userData.email,
+    name: userData.name,
+    alias: userData.alias
+  })
+
+  if (isRegistered) return res.status(400).json('已註冊的使用者')
+
   userData.password = hashSync(userData.password)
   const result = await createUser(userData)
 
   res.json(result)
-  // res.redirect('http://localhost:8080/#/register')
-}
-
-async function httpUpsertUser (req: Request, res: Response) {
-  const userData = req.body
-  // const user = await upsertUser(userData)
-  // sendMail(userData.email)
-  console.log('❤️❤️', userData)
-  // res.json({ result: 'ok' })
-  res.redirect('http://localhost:8080/#/register')
 }
 
 async function httpAddUserFollowShip (req: Request, res: Response) {
@@ -70,6 +66,13 @@ async function httpGetUser (req: Request, res: Response) {
       id: req.params.userId,
       isLoginUser: false
     })
+    // * get image from S3 using file key
+    if (result) {
+      if (!/^https/.exec(result.avatarUrl)) result.avatarUrl = await getFileFromS3(result.avatarUrl)
+      if (!/^https/.exec(result.bgImageUrl)) result.bgImageUrl = await getFileFromS3(result.bgImageUrl)
+    }
+    // ***
+
     return res.json(result)
   }
   const { account, password } = req.body
@@ -78,15 +81,24 @@ async function httpGetUser (req: Request, res: Response) {
     return res.json(result)
   }
   generateTokensThenSetCookie(result, res)
-  res.json(result)
-}
-
-async function httpGetPopUsers (req: Request, res: Response) {
-  const { userId } = req.params
-  const result = await getPopUsers(userId)
 
   res.json(result)
 }
+
+// async function httpGetPopUsers (req: Request, res: Response) {
+//   const { userId, skip } = req.params
+//   const result = await getPopUsers(userId, Number(skip))
+//   if (result) {
+//     await Promise.all(result.map(async (user) => {
+//       if (!/^https/.exec(user.avatarUrl)) {
+//         user.avatarUrl = await getFileFromS3(user.avatarUrl)
+//       }
+//       return user
+//     }))
+//   }
+
+//   res.json(result)
+// }
 
 async function httpUpdateUser (req: Request, res: Response) {
   const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined
@@ -135,25 +147,14 @@ async function httpUpdateUser (req: Request, res: Response) {
       avatarKey: s3FileKeys.avatarKey
     }
   })
+  // TODO: get S3 files url to map the result above before response
   res.json(result)
 }
 
 async function httpGetGoolgeUser (req: Request, res: Response) {
   const { token } = req.body
   const user = await getGoogleUser(token)
-  const tokens = generateTokensThenSetCookie(user, res)
-
-  refreshTokenList.push(tokens.refreshToken)
-  console.log(refreshTokenList)
-  res.cookie('reToken', tokens.refreshToken, {
-    httpOnly: true,
-    secure: true
-  })
-
-  res.cookie('acToken', tokens.accessToken, {
-    httpOnly: true,
-    secure: true
-  })
+  generateTokensThenSetCookie(user, res)
 
   res.json(user)
 }
@@ -171,18 +172,18 @@ async function httpGetAdmin (req: Request, res: Response) {
   res.json(result)
 }
 
-function httpLogout () {
-  // TODO: clean token session
-  console.log('logout')
+function httpLogout (req: Request, res: Response) {
+  const refreshToken = req.cookies.reToken
+  refreshTokenList.splice(refreshTokenList.indexOf(refreshToken), 1)
+  res.json('ok')
 }
 
 export {
-  httpUpsertUser,
   httpCreateUser,
   httpGetUsers,
   httpGetUser,
   httpGetAdmin,
-  httpGetPopUsers,
+  // httpGetPopUsers,
   httpUpdateUser,
   httpAddUserFollowShip,
   httpDeleteUserFollowShip,

@@ -50,11 +50,22 @@ class CommentData {
 
   setJoin () {
     if (this.comment.commentId) {
-      this.join.onComment = { select: { authorId: true } }
+      this.join.onComment = {
+        select: { authorId: true }
+      }
     } else {
-      this.join.onPost = { select: { authorId: true } }
+      this.join.onPost = {
+        select: {
+          authorId: true,
+          author: {
+            select: {
+              name: true,
+              alias: true
+            }
+          }
+        }
+      }
     }
-
     return this.join
   }
 }
@@ -66,11 +77,36 @@ async function createComment (comment: { [key: string]: string }) {
       data: commentData.setQuery(),
       include: commentData.setJoin()
     })
-    prisma.$disconnect()
     return result
   } catch (err) {
     console.log(err)
-    prisma.$disconnect()
+  }
+}
+
+async function getComments (userId: string) {
+  try {
+    const comments = await prisma.comment.findMany({
+      where: { authorId: userId },
+      include: {
+        author: {
+          select: {
+            name: true,
+            alias: true,
+            avatarUrl: true
+          }
+        },
+        liked: true,
+        onPost: {
+          include: {
+            liked: true,
+            author: true
+          }
+        }
+      }
+    })
+    return comments
+  } catch (err) {
+    console.error(err)
   }
 }
 
@@ -164,6 +200,7 @@ async function deleteLikeComment (likeCommentInfo: { [key: string]: string }) {
 
 export {
   getComment,
+  getComments,
   getAttatchComments,
   createComment,
   createLikeComment,

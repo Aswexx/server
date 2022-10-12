@@ -27,16 +27,38 @@ async function getUsers () {
           select: {
             follow: true,
             followed: true,
-            posts: true
+            posts: true,
+            comments: true
           }
         },
         posts: {
           select: {
             liked: true
           }
-        }
-      }
+        },
+        follow: true,
+        followed: true
+      },
+      orderBy: { createdAt: 'desc' }
     })
+
+    // * 以是否直接放http url 區分假帳號與真實創建，後者需要再把 s3 key 轉成暫時性 url
+
+    await Promise.all(result.map(async (user) => {
+      if (!/^https/.exec(user.avatarUrl)) {
+        const urls = await Promise.all([
+          await getFileFromS3(user.bgImageUrl),
+          await getFileFromS3(user.avatarUrl)
+        ])
+        user.bgImageUrl = urls[0]
+        user.avatarUrl = urls[1]
+      }
+
+      return user
+    }))
+
+    // *****
+
     return result
   } catch (err) {
     await prisma.$disconnect()
@@ -69,7 +91,7 @@ async function createUser (data: registerData) {
     return result
   } catch (err) {
     await prisma.$disconnect()
-    console.log(err)
+    console.error(err)
   }
 }
 
@@ -201,8 +223,6 @@ async function getUser (userState: UserState, loginInfo?: LoginInfo) {
     await prisma.$disconnect()
     // * 以是否直接放http url 區分假帳號與真實創建，後者需要再把 s3 key 轉成暫時性 url
     if (user && !/^https/.exec(user.avatarUrl)) {
-      // user.bgImageUrl = await getFileFromS3(user.bgImageUrl)
-      // user.avatarUrl = await getFileFromS3(user.avatarUrl)
       const urls = await Promise.all(
         [
           await getFileFromS3(user.bgImageUrl),
@@ -211,13 +231,24 @@ async function getUser (userState: UserState, loginInfo?: LoginInfo) {
       )
       user.bgImageUrl = urls[0]
       user.avatarUrl = urls[1]
-      // console.log('🔗', user.avatarUrl, user.bgImageUrl)
-      console.log('🔗', urls)
     }
     return user
   } catch (err) {
     console.log(err)
     await prisma.$disconnect()
+  }
+}
+
+async function findUniqueUser (infos: { email: string, name: string, alias: string }) {
+  try {
+    const { email, name, alias } = infos
+    const result = await prisma.user.findMany({
+      where: { OR: [{ email }, { name }, { alias }] }
+    })
+
+    return result.length
+  } catch (err) {
+    console.error(err)
   }
 }
 
@@ -252,32 +283,33 @@ async function getGoogleUser (token: string) {
   }
 }
 
-async function getPopUsers (userId: string) {
-  try {
-    const users = await prisma.user.findMany({
-      where: { id: { notIn: [userId] } },
-      orderBy: {
-        posts: {
-          _count: 'desc'
-        }
-      },
-      select: {
-        id: true,
-        name: true,
-        avatarUrl: true,
-        alias: true,
-        followed: true
-      },
-      take: 10
-    })
+// async function getPopUsers (userId: string, skip: number) {
+//   try {
+//     const users = await prisma.user.findMany({
+//       where: { id: { notIn: [userId] } },
+//       orderBy: {
+//         posts: {
+//           _count: 'desc'
+//         }
+//       },
+//       select: {
+//         id: true,
+//         name: true,
+//         avatarUrl: true,
+//         alias: true,
+//         followed: true
+//       },
+//       take: 10,
+//       skip
+//     })
 
-    await prisma.$disconnect()
-    return users
-  } catch (err) {
-    console.log(err)
-    await prisma.$disconnect()
-  }
-}
+//     await prisma.$disconnect()
+//     return users
+//   } catch (err) {
+//     console.log(err)
+//     await prisma.$disconnect()
+//   }
+// }
 
 async function getAdmin (loginInfo: LoginInfo) {
   try {
@@ -314,7 +346,8 @@ export {
   getUsers,
   getGoogleUser,
   getAdmin,
-  getPopUsers,
+  // getPopUsers,
+  findUniqueUser,
   addUserFollowShip,
   deleteUserFollowShip
 }

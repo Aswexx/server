@@ -2,9 +2,12 @@ import { Request, Response } from 'express'
 import {
   getPost,
   getPosts,
+  getUserLikePosts,
+  getPostsByKeyword,
   getUserPosts,
   getPostsByMostComments,
   getPostsByMostLiked,
+  getAllPostsCreatedAt,
   createPost,
   createLikePost,
   deleteLikePost,
@@ -15,9 +18,12 @@ import { interactEE } from '../../notificationSocket'
 import { addNewFileToS3, getFileFromS3 } from '../../services/s3'
 
 async function httpGetPosts (req: Request, res: Response) {
-  const { skipPostsCount, take, order } = req.query
+  const { skipPostsCount, take, order, keyword } = req.query
   let results
-  if (!/most/.exec(order as string)) {
+
+  if (keyword) {
+    results = await getPostsByKeyword(keyword as string)
+  } else if (!/most/.exec(order as string)) {
     results = await getPosts(Number(skipPostsCount), Number(take), order as string)
   } else if (order === 'mostComments') {
     results = await getPostsByMostComments(Number(skipPostsCount), Number(take))
@@ -25,39 +31,77 @@ async function httpGetPosts (req: Request, res: Response) {
     results = await getPostsByMostLiked(Number(skipPostsCount), Number(take))
   }
 
-  const mapResults = await Promise.all(results.posts.map(async (post) => {
-    if (post.media) {
-      post.media.url = await getFileFromS3(post.media.url)
-    }
+  if (!results) {
+    return res.json(null)
+  }
 
-    if (post.comments.length) {
-      for (const comment of post.comments) {
-        if (comment.media && comment.media.url) {
-          comment.media.url = await getFileFromS3(comment.media.url)
+  const mapResults = await Promise.all(
+    results.posts.map(async (post) => {
+      if (post.media) {
+        post.media.url = await getFileFromS3(post.media.url)
+      }
+
+      if (post.comments.length) {
+        for (const comment of post.comments) {
+          if (comment.media && comment.media.url) {
+            comment.media.url = await getFileFromS3(comment.media.url)
+          }
+
+          comment.author.avatarUrl = await getFileFromS3(comment.author.avatarUrl)
         }
       }
-    }
 
-    if (!/^https/.exec(post.author.avatarUrl)) {
-      post.author.avatarUrl = await getFileFromS3(post.author.avatarUrl)
-    }
+      if (!/^https/.exec(post.author.avatarUrl)) {
+        post.author.avatarUrl = await getFileFromS3(post.author.avatarUrl)
+      }
 
-    return post
-  }))
-  console.log(results.postCount)
+      return post
+    })
+  )
   res.json({ ...mapResults, postCount: results.postCount })
 }
 
 async function httpGetUserPosts (req: Request, res: Response) {
   const { userId } = req.params
 
-  const result = await getUserPosts(userId)
-  res.json(result)
+  const posts = await getUserPosts(userId)
+  // * convert file key to image url
+  if (!/^https/.exec(posts[0].author.avatarUrl)) {
+    const userAvatarUrl = await getFileFromS3(posts[0].author.avatarUrl)
+    posts.forEach(post => {
+      post.author.avatarUrl = userAvatarUrl
+    })
+  }
+  res.json(posts)
+}
+
+async function httpGetUserLikePosts (req: Request, res: Response) {
+  const { userId } = req.params
+  const likes = await getUserLikePosts(userId)
+
+  if (likes) {
+    await Promise.all(
+      likes.map(async (like) => {
+        const key = like.post.author.avatarUrl
+        if (!/^https/.exec(key)) {
+          like.post.author.avatarUrl = await getFileFromS3(key)
+        }
+      })
+    )
+  }
+
+  res.json(likes)
 }
 
 async function httpGetPost (req: Request, res: Response) {
   const { postId } = req.params
   const result = await getPost(postId)
+
+  res.json(result)
+}
+
+async function httpGetAllPostsCreatedAt (req: Request, res: Response) {
+  const result = await getAllPostsCreatedAt()
 
   res.json(result)
 }
@@ -74,8 +118,9 @@ async function httpCreatePost (req: Request, res: Response) {
     newPost.mediaType = file.ContentType
   }
 
-  const result = await createPost(newPost)
-  res.json(result)
+  const post = await createPost(newPost)
+
+  res.json(post)
 }
 
 async function httpUpdateLikePost (req: Request, res: Response) {
@@ -111,7 +156,9 @@ async function httpDeletePost (req: Request, res: Response) {
 export {
   httpGetPosts,
   httpGetUserPosts,
+  httpGetUserLikePosts,
   httpGetPost,
+  httpGetAllPostsCreatedAt,
   httpCreatePost,
   httpUpdateLikePost,
   httpDeletePost
