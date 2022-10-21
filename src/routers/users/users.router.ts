@@ -10,13 +10,12 @@ import {
   httpGetGoolgeUser,
   httpLogout,
   httpGetUsers,
-  httpAddUserFollowShip,
-  httpDeleteUserFollowShip
+  httpAddFollow,
+  httpDeleteFollow
 } from './users.controller'
 
 const usersRouter = express.Router()
 
-// usersRouter.get('/popular/:userId/:skip', httpGetPopUsers)
 usersRouter.get('/logout', httpLogout)
 usersRouter.get('/:userId', httpGetUser)
 usersRouter.patch('/:userId', uploadProfileImages, httpUpdateUser)
@@ -28,7 +27,9 @@ usersRouter.post('/admin', httpGetAdmin)
 
 usersRouter.get('/', httpGetUsers)
 usersRouter.post('/', parseFormDataText, httpCreateUser)
-usersRouter.put('/', httpAddUserFollowShip)
-usersRouter.delete('/:followShipId', httpDeleteUserFollowShip)
+
+// * followship
+usersRouter.delete('/follow/:followshipId', httpDeleteFollow)
+usersRouter.post('/follow', httpAddFollow)
 
 export { usersRouter }

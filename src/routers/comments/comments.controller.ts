@@ -68,10 +68,21 @@ async function httpGetComment (req: Request, res: Response) {
 
 async function httpGetAttatchComments (req: Request, res: Response) {
   const { commentId } = req.params
-  const result = await getAttatchComments(commentId)
-  console.log('🐶🐶🐶', result)
+  const comments = await getAttatchComments(commentId)
 
-  res.json(result)
+  // TODO: need avoid make duplicate requset to S3 because of same filekey
+  if (comments) {
+    await Promise.all(comments.map(async (comment) => {
+      const fileKey = comment.author.avatarUrl
+      if (!/^https/.exec(fileKey)) {
+        const avatarUrl = await getFileFromS3(fileKey)
+        comment.author.avatarUrl = avatarUrl
+      }
+
+      return comment
+    }))
+  }
+  res.json(comments)
 }
 
 async function httpUpdateLikeComment (req: Request, res: Response) {

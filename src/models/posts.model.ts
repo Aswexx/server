@@ -370,13 +370,47 @@ async function createPost (newPost: Post) {
   try {
     const result = await prisma.post.create({
       data: new PostData(newPost).setQuery(),
-      select: postSelector
+      select: {
+        id: true,
+        contents: true,
+        createdAt: true,
+        liked: true,
+        comments: {
+          select: {
+            id: true,
+            contents: true,
+            createdAt: true,
+            media: {
+              select: { url: true, type: true }
+            },
+            author: {
+              select: {
+                name: true,
+                alias: true,
+                avatarUrl: true
+              }
+            },
+            liked: {
+              select: { userId: true }
+            }
+          }
+        },
+        author: {
+          select: {
+            id: true,
+            name: true,
+            alias: true,
+            avatarUrl: true
+          }
+        },
+        media: {
+          select: { url: true, type: true }
+        }
+      }
     })
-    await prisma.$disconnect()
     return result
   } catch (err) {
-    console.log(err)
-    await prisma.$disconnect()
+    console.error(err)
   }
 }
 

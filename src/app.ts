@@ -11,9 +11,10 @@ import { notifRouter } from './routers/notifications/notif.router'
 // import multer from 'multer'
 
 import cors from 'cors'
-import morgan from 'morgan'
+// import morgan from 'morgan'
 import cookieParser from 'cookie-parser'
 import { authenticateToken } from './util/tokens'
+
 const app = express()
 require('dotenv').config()
 
@@ -23,7 +24,6 @@ const whitelist = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    console.log('🧨', origin)
     if (whitelist.indexOf(origin as string) !== -1 || !origin) {
       callback(null, true)
     } else {
@@ -37,7 +37,7 @@ app.use(cors({
 //   origin: '*'
 // }))
 // app.use(helmet())
-app.use(morgan('dev'))
+// app.use(morgan('dev'))
 
 app.use(cookieSession({
   name: 'c-s',

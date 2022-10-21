@@ -134,28 +134,26 @@ interface FollowRelation {
   followedId: string
 }
 
-async function addUserFollowShip (updateInfo: FollowRelation) {
+async function addFollow (updateInfo: FollowRelation) {
   try {
     const result = await prisma.followingShip.create({
       data: {
         followerId: updateInfo.followerId,
         followedId: updateInfo.followedId
-      },
-      include: {
-        follower: { select: { name: true } }
       }
+      // include: {
+      //   follower: { select: { name: true } }
+      // }
     })
 
-    await prisma.$disconnect()
     return result
   } catch (e) {
     console.log(e)
-    await prisma.$disconnect()
     process.exit(1)
   }
 }
 
-async function deleteUserFollowShip (followShipId: string) {
+async function deleteFollow (followShipId: string) {
   try {
     const result = await prisma.followingShip.delete({
       where: { id: followShipId }
@@ -220,7 +218,6 @@ async function getUser (userState: UserState, loginInfo?: LoginInfo) {
       }
     })
 
-    await prisma.$disconnect()
     // * 以是否直接放http url 區分假帳號與真實創建，後者需要再把 s3 key 轉成暫時性 url
     if (user && !/^https/.exec(user.avatarUrl)) {
       const urls = await Promise.all(
@@ -232,6 +229,7 @@ async function getUser (userState: UserState, loginInfo?: LoginInfo) {
       user.bgImageUrl = urls[0]
       user.avatarUrl = urls[1]
     }
+
     return user
   } catch (err) {
     console.log(err)
@@ -348,6 +346,6 @@ export {
   getAdmin,
   // getPopUsers,
   findUniqueUser,
-  addUserFollowShip,
-  deleteUserFollowShip
+  addFollow,
+  deleteFollow
 }

@@ -42,8 +42,10 @@ model User {
   likeComment   LikeComment[]
   follow        FollowingShip[] @relation("follow")
   followed      FollowingShip[] @relation("followed")
-  notifReciever Notification[]  @relation("receive")
+  chatSender    ChatRecord[]    @relation("send")
+  chatReciever  ChatRecord[]    @relation("chatTarget")
   notifinformer Notification[]  @relation("inform")
+  notifReciever Notification[]  @relation("receive")
 
   @@map("users")
 }
@@ -140,17 +142,6 @@ model FollowingShip {
   @@map("following_ships")
 }
 
-// model ProfileImage {
-//   id        String   @id @default(uuid()) @db.Char(36)
-//   url       String
-//   createdAt DateTime @default(now()) @map("created_at")
-
-//   avatarUser  User? @relation("avatar")
-//   bgImageUser User? @relation("bgImage")
-
-//   @@map("profile_images")
-// }
-
 model MediaFile {
   id        String   @id @default(uuid()) @db.Char(36)
   url       String
@@ -193,4 +184,19 @@ model Notification {
   updatedAt DateTime @default(now()) @map("updated_at")
 
   @@map("notifications")
+}
+
+model ChatRecord {
+  id       String @id @default(uuid()) @db.Char(36)
+  sender   User   @relation("send", fields: [senderId], references: [id])
+  senderId String @map("sender_id")
+
+  contents String
+
+  chatTarget   User   @relation("chatTarget", fields: [chatTargetId], references: [id])
+  chatTargetId String @map("chat_target_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("chat_records")
 }

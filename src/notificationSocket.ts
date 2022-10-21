@@ -1,14 +1,34 @@
 import { Server } from 'socket.io'
 import { EventEmitter } from 'events'
+import {
+  setOnlineUser,
+  removeOnlineUser,
+  getOnlineUsers
+} from './services/redis'
+import schedule from 'node-schedule'
 
+const pushOnlineUsersEE = new EventEmitter()
 const interactEE = new EventEmitter()
+
+// * push onlineUsers at the 30th second of every minute
+schedule.scheduleJob('30 * * * * *', async () => {
+  const users = await getOnlineUsers()
+  pushOnlineUsersEE.emit('update', users)
+})
 
 function notificationSocket (io: Server) {
   const notification = io.of('/notification')
   notification.on('connection', (socket) => {
     console.log(`a user connect to notification socket. id: ${socket.id}`)
 
-    notification.emit('ready', 'hello')
+    pushOnlineUsersEE.on('update', (updatedList) => {
+      socket.emit('onlineUsers', updatedList)
+    })
+
+    socket.on('setOnlineUser', async (userId) => {
+      await setOnlineUser(socket.id, userId)
+    })
+
     let followHandler: (notif: { [key: string]: string | { name: string } }) => void
     let inviteChatHandler: (notif: { [key: string]: string }) => void
     let replyPostHandler: (notif: { [key: string]: string }) => void
@@ -17,6 +37,7 @@ function notificationSocket (io: Server) {
     let likeCommentHandler: (notif: { [key: string]: string }) => void
 
     socket.on('setChannel', (listeningUserId) => {
+      console.log('notif channel created!')
       socket.join(listeningUserId)
       followHandler = (notif) => {
         // * no need to emit informer's listener
@@ -55,13 +76,11 @@ function notificationSocket (io: Server) {
       interactEE.on('replyComment', replyCommentHandler)
       interactEE.on('likePost', likePostHandler)
       interactEE.on('likeComment', likeCommentHandler)
-
-      console.log('📧', interactEE.eventNames())
-      console.log('📧follow', interactEE.listenerCount('follow'))
     })
 
-    socket.on('disconnect', (reason) => {
+    socket.on('disconnect', async (reason) => {
       console.log(`notif Client ${socket.id} disconnected.\nreason: ${reason}`)
+      await removeOnlineUser(socket.id)
 
       interactEE.removeListener('follow', followHandler)
       interactEE.removeListener('inviteChat', inviteChatHandler)
@@ -69,9 +88,6 @@ function notificationSocket (io: Server) {
       interactEE.removeListener('replyComment', replyCommentHandler)
       interactEE.removeListener('likePost', likePostHandler)
       interactEE.removeListener('likeComment', likeCommentHandler)
-
-      console.log('📧', interactEE.eventNames())
-      console.log('📧follow', interactEE.listenerCount('follow'))
     })
   })
 }

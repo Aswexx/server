@@ -6,9 +6,8 @@ import {
   getAdmin,
   createUser,
   updateUser,
-  // getPopUsers,
-  addUserFollowShip,
-  deleteUserFollowShip,
+  addFollow,
+  deleteFollow,
   getGoogleUser
 } from '../../models/users.model'
 import { createNotif, NotifType } from '../../models/notif.model'
@@ -40,24 +39,24 @@ async function httpCreateUser (req: Request, res: Response) {
   res.json(result)
 }
 
-async function httpAddUserFollowShip (req: Request, res: Response) {
+async function httpAddFollow (req: Request, res: Response) {
   const updateInfo = req.body
-  const user = await addUserFollowShip(updateInfo)
+  const followship = await addFollow(updateInfo)
   const notif = await createNotif({
-    receiverId: user.followedId,
-    informerId: user.followerId,
+    receiverId: followship.followedId,
+    informerId: followship.followerId,
     notifType: NotifType.follow
   })
 
   interactEE.emit('follow', notif)
 
-  res.json(user)
+  res.json(followship)
 }
 
-async function httpDeleteUserFollowShip (req: Request, res: Response) {
-  const { followShipId } = req.params
-  const user = await deleteUserFollowShip(followShipId)
-  res.json(user)
+async function httpDeleteFollow (req: Request, res: Response) {
+  const { followshipId } = req.params
+  const romovedFollowship = await deleteFollow(followshipId)
+  res.json(romovedFollowship)
 }
 
 async function httpGetUser (req: Request, res: Response) {
@@ -84,21 +83,6 @@ async function httpGetUser (req: Request, res: Response) {
 
   res.json(result)
 }
-
-// async function httpGetPopUsers (req: Request, res: Response) {
-//   const { userId, skip } = req.params
-//   const result = await getPopUsers(userId, Number(skip))
-//   if (result) {
-//     await Promise.all(result.map(async (user) => {
-//       if (!/^https/.exec(user.avatarUrl)) {
-//         user.avatarUrl = await getFileFromS3(user.avatarUrl)
-//       }
-//       return user
-//     }))
-//   }
-
-//   res.json(result)
-// }
 
 async function httpUpdateUser (req: Request, res: Response) {
   const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined
@@ -137,7 +121,7 @@ async function httpUpdateUser (req: Request, res: Response) {
       }
     }
   }
-  console.log('⭕⭕', s3FileKeys)
+
   const result = await updateUser({
     userId,
     alias: text.alias,
@@ -148,6 +132,10 @@ async function httpUpdateUser (req: Request, res: Response) {
     }
   })
   // TODO: get S3 files url to map the result above before response
+  if (result) {
+    result.avatarUrl = await getFileFromS3(result.avatarUrl)
+    result.bgImageUrl = await getFileFromS3(result.bgImageUrl)
+  }
   res.json(result)
 }
 
@@ -183,10 +171,9 @@ export {
   httpGetUsers,
   httpGetUser,
   httpGetAdmin,
-  // httpGetPopUsers,
   httpUpdateUser,
-  httpAddUserFollowShip,
-  httpDeleteUserFollowShip,
+  httpAddFollow,
+  httpDeleteFollow,
   httpGetGoolgeUser,
   httpLogout
 }

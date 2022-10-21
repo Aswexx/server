@@ -149,10 +149,8 @@ async function getAttatchComments (commentId: string) {
         }
       }
     })
-    await prisma.$disconnect()
     return result
   } catch (e) {
-    await prisma.$disconnect()
     console.error(e)
   }
 }
