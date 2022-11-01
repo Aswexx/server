@@ -11,15 +11,43 @@ import {
   getGoogleUser
 } from '../../models/users.model'
 import { createNotif, NotifType } from '../../models/notif.model'
-// import { sendMail } from '../../services/gmail'
+import { sendMail } from '../../services/gmail'
 import { hashSync } from '../../util/bcrypt'
 import { generateTokensThenSetCookie, refreshTokenList } from '../../util/tokens'
 import { interactEE } from './../../notificationSocket'
 import { addNewFileToS3, getFileFromS3 } from '../../services/s3'
+import crypto from 'crypto'
+import { compareEmailVertificationCodeThenCreate, redisClient, saveEmailVertificationCodeAndTempData } from '../../services/redis'
+import { Mutex } from '../../util/mutex'
+
+const getVertificationCode = (bytes = 4) =>
+  crypto.randomBytes(bytes).toString('hex')
 
 async function httpGetUsers (req: Request, res: Response) {
   const result = await getUsers()
   res.json(result)
+}
+
+async function waitForEmailVertification (req: Request, res: Response) {
+  const userData = req.body
+  const vertificationCode = getVertificationCode()
+  sendMail(userData.email, vertificationCode)
+  await saveEmailVertificationCodeAndTempData(vertificationCode, userData)
+  res.json(userData)
+}
+
+async function httpEmailVertification (req: Request, res: Response) {
+  const { vertifyCode } = req.body
+  console.log(vertifyCode)
+  const userDataToCreate = await compareEmailVertificationCodeThenCreate(vertifyCode)
+  if (!userDataToCreate) {
+    return res.status(400).json('驗證碼錯誤或失效，請重新嘗試註冊')
+  }
+
+  console.log(userDataToCreate)
+  userDataToCreate.password = hashSync(userDataToCreate.password)
+  await createUser(userDataToCreate)
+  res.json({ success: 'ok' })
 }
 
 async function httpCreateUser (req: Request, res: Response) {
@@ -60,6 +88,19 @@ async function httpDeleteFollow (req: Request, res: Response) {
 }
 
 async function httpGetUser (req: Request, res: Response) {
+  const cacheKey = `userData:${req.params.userId}`
+  const cacheResult = await redisClient.get(cacheKey)
+  const mutex = new Mutex()
+  if (cacheResult) {
+    return res.json(JSON.parse(cacheResult))
+  } else {
+    const cacheResult = await mutex.lock(cacheKey)
+    if (cacheResult) {
+      mutex.releaseLock(cacheKey)
+      return res.json(JSON.parse(cacheResult))
+    }
+  }
+
   if (!Object.hasOwn(req.body, 'account')) {
     const result = await getUser({
       id: req.params.userId,
@@ -67,20 +108,25 @@ async function httpGetUser (req: Request, res: Response) {
     })
     // * get image from S3 using file key
     if (result) {
-      if (!/^https/.exec(result.avatarUrl)) result.avatarUrl = await getFileFromS3(result.avatarUrl)
-      if (!/^https/.exec(result.bgImageUrl)) result.bgImageUrl = await getFileFromS3(result.bgImageUrl)
+      if (!/^https/.exec(result.avatarUrl)) { result.avatarUrl = await getFileFromS3(result.avatarUrl) }
+      if (!/^https/.exec(result.bgImageUrl)) { result.bgImageUrl = await getFileFromS3(result.bgImageUrl) }
     }
     // ***
-
+    await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(result))
+    mutex.releaseLock(cacheKey)
     return res.json(result)
   }
   const { account, password } = req.body
   const result = await getUser({ isLoginUser: true }, { account, password })
   if (!result) {
+    await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(result))
+    mutex.releaseLock(cacheKey)
     return res.json(result)
   }
   generateTokensThenSetCookie(result, res)
 
+  await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(result))
+  mutex.releaseLock(cacheKey)
   res.json(result)
 }
 
@@ -131,7 +177,6 @@ async function httpUpdateUser (req: Request, res: Response) {
       avatarKey: s3FileKeys.avatarKey
     }
   })
-  // TODO: get S3 files url to map the result above before response
   if (result) {
     result.avatarUrl = await getFileFromS3(result.avatarUrl)
     result.bgImageUrl = await getFileFromS3(result.bgImageUrl)
@@ -167,6 +212,8 @@ function httpLogout (req: Request, res: Response) {
 }
 
 export {
+  waitForEmailVertification,
+  httpEmailVertification,
   httpCreateUser,
   httpGetUsers,
   httpGetUser,

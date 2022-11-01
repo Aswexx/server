@@ -2,7 +2,9 @@ import express from 'express'
 import { parseFormDataText, uploadProfileImages } from '../../util/multer'
 // import { setMaxAgeCache } from '../../util/cache-control'
 import {
-  httpCreateUser,
+  // httpCreateUser,
+  waitForEmailVertification,
+  httpEmailVertification,
   // httpGetPopUsers,
   httpGetUser,
   httpGetAdmin,
@@ -26,7 +28,9 @@ usersRouter.post('/normal', httpGetUser)
 usersRouter.post('/admin', httpGetAdmin)
 
 usersRouter.get('/', httpGetUsers)
-usersRouter.post('/', parseFormDataText, httpCreateUser)
+// usersRouter.post('/', parseFormDataText, httpCreateUser)
+usersRouter.post('/emailVertification', httpEmailVertification)
+usersRouter.post('/', parseFormDataText, waitForEmailVertification)
 
 // * followship
 usersRouter.delete('/follow/:followshipId', httpDeleteFollow)

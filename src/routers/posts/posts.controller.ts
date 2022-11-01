@@ -16,10 +16,26 @@ import {
 import { createNotif, NotifType } from '../../models/notif.model'
 import { interactEE } from '../../notificationSocket'
 import { addNewFileToS3, getFileFromS3 } from '../../services/s3'
+import { redisClient } from '../../services/redis'
+import { Mutex } from '../../util/mutex'
 
 async function httpGetPosts (req: Request, res: Response) {
   const { skipPostsCount, take, order, keyword } = req.query
   let results
+
+  const cacheKey = `${skipPostsCount}${take}${order}${keyword}`
+  const cacheResult = await redisClient.get(cacheKey)
+  const mutex = new Mutex()
+
+  if (cacheResult) {
+    return res.json(JSON.parse(cacheResult))
+  } else {
+    const cacheResult = await mutex.lock(cacheKey)
+    if (cacheResult) {
+      mutex.releaseLock(cacheKey)
+      return res.json(JSON.parse(cacheResult))
+    }
+  }
 
   if (keyword) {
     results = await getPostsByKeyword(keyword as string)
@@ -58,11 +74,31 @@ async function httpGetPosts (req: Request, res: Response) {
       return post
     })
   )
+  await redisClient.setEx(
+    cacheKey,
+    10 * 60,
+    JSON.stringify({ ...mapResults, postCount: results.postCount })
+  )
+  mutex.releaseLock(cacheKey)
   res.json({ ...mapResults, postCount: results.postCount })
 }
 
 async function httpGetUserPosts (req: Request, res: Response) {
   const { userId } = req.params
+
+  const cacheKey = `recentPosts:${userId}`
+  const cacheResult = await redisClient.get(cacheKey)
+  const mutex = new Mutex()
+
+  if (cacheResult) {
+    return res.json(JSON.parse(cacheResult))
+  } else {
+    const cacheResult = await mutex.lock(cacheKey)
+    if (cacheResult) {
+      mutex.releaseLock(cacheKey)
+      return res.json(JSON.parse(cacheResult))
+    }
+  }
 
   const posts = await getUserPosts(userId)
   // * convert file key to image url if user has any post
@@ -74,11 +110,28 @@ async function httpGetUserPosts (req: Request, res: Response) {
       })
     }
   }
+  await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(posts))
+  mutex.releaseLock(cacheKey)
   res.json(posts)
 }
 
 async function httpGetUserLikePosts (req: Request, res: Response) {
   const { userId } = req.params
+
+  const cacheKey = `likePosts:${userId}`
+  const cacheResult = await redisClient.get(cacheKey)
+  const mutex = new Mutex()
+
+  if (cacheResult) {
+    return res.json(JSON.parse(cacheResult))
+  } else {
+    const cacheResult = await mutex.lock(cacheKey)
+    if (cacheResult) {
+      mutex.releaseLock(cacheKey)
+      return res.json(JSON.parse(cacheResult))
+    }
+  }
+
   const likes = await getUserLikePosts(userId)
 
   if (likes) {
@@ -92,12 +145,26 @@ async function httpGetUserLikePosts (req: Request, res: Response) {
     )
   }
 
+  await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(likes))
+  mutex.releaseLock(cacheKey)
   res.json(likes)
 }
 
 async function httpGetPost (req: Request, res: Response) {
   const { postId } = req.params
   const result = await getPost(postId)
+  if (result) {
+    const avatarUrl = await getFileFromS3(result.author.avatarUrl)
+    result.author.avatarUrl = avatarUrl
+
+    if (result.comments.length) {
+      await Promise.all(result.comments.map(async (comment) => {
+        const avatarUrl = await getFileFromS3(comment.author.avatarUrl)
+        comment.author.avatarUrl = avatarUrl
+        return comment
+      }))
+    }
+  }
 
   res.json(result)
 }

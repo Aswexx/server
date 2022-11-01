@@ -11,7 +11,7 @@ import { notifRouter } from './routers/notifications/notif.router'
 // import multer from 'multer'
 
 import cors from 'cors'
-// import morgan from 'morgan'
+import morgan from 'morgan'
 import cookieParser from 'cookie-parser'
 import { authenticateToken } from './util/tokens'
 
@@ -37,7 +37,7 @@ app.use(cors({
 //   origin: '*'
 // }))
 // app.use(helmet())
-// app.use(morgan('dev'))
+app.use(morgan('dev'))
 
 app.use(cookieSession({
   name: 'c-s',

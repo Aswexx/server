@@ -1,10 +1,10 @@
 import { createClient } from 'redis'
 
 const EXP_TIME = 10 * 60
+const EMAIL_VERTIFY_EXP = 15 * 60
 
 const subscriber = createClient()
 const redisClient = createClient();
-// let onlineUsers: string[]
 (async function connectToRedis () {
   try {
     await redisClient.connect()
@@ -37,7 +37,6 @@ async function removeOnlineUser (socketId: string) {
 
 async function setChatRoom (roomInfo: { triggerUser: string, targetUser: string, roomId: string }) {
   const { triggerUser, targetUser, roomId } = roomInfo
-  // await redisClient.hSet('chatRooms', triggerUser, roomId)
   await redisClient.hSet(
     'chatRooms',
     JSON.stringify({ triggerUser, targetUser }),
@@ -84,6 +83,28 @@ async function saveMsgRecord (chatRecord: { roomId: string, message: string, sen
 async function loadChatRecord (roomId: string) {
   return await redisClient.lRange(roomId, 0, -1)
 }
+
+interface TempData {
+  email: string
+  password: string
+  passwordCheck: string
+  name: string
+  alias: string
+}
+
+async function saveEmailVertificationCodeAndTempData (verifyCode: string, tempData: TempData) {
+  await redisClient.setEx(verifyCode, EMAIL_VERTIFY_EXP, JSON.stringify(tempData))
+}
+
+async function compareEmailVertificationCodeThenCreate (verifyCode: string) {
+  const tempData = await redisClient.get(verifyCode)
+  if (tempData) {
+    await redisClient.del(verifyCode)
+    return JSON.parse(tempData)
+  }
+  return null
+}
+
 export {
   setOnlineUser,
   removeOnlineUser,
@@ -91,5 +112,8 @@ export {
   setChatRoom,
   saveMsgRecord,
   checkRoomExist,
-  loadChatRecord
+  loadChatRecord,
+  saveEmailVertificationCodeAndTempData,
+  compareEmailVertificationCodeThenCreate,
+  redisClient
 }

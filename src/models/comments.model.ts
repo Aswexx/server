@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 class CommentData {
-  constructor (public comment: { [key: string]: string }) { }
+  constructor (public comment: { [key: string]: string }) {}
   basic = {
     contents: this.comment.contents,
     author: {
@@ -23,6 +23,7 @@ class CommentData {
       }
     },
     onPost: {},
+    media: {},
     onComment: {},
     liked: {
       select: { userId: true }
@@ -31,9 +32,15 @@ class CommentData {
 
   setQuery () {
     if (this.comment.commentId) {
-      this.basic = { ...this.basic, onComment: { connect: { id: this.comment.commentId } } }
+      this.basic = {
+        ...this.basic,
+        onComment: { connect: { id: this.comment.commentId } }
+      }
     } else {
-      this.basic = { ...this.basic, onPost: { connect: { id: this.comment.postId } } }
+      this.basic = {
+        ...this.basic,
+        onPost: { connect: { id: this.comment.postId } }
+      }
     }
 
     if (this.comment.mediaType) {
@@ -64,6 +71,13 @@ class CommentData {
             }
           }
         }
+      }
+    }
+
+    this.join.media = {
+      select: {
+        type: true,
+        url: true
       }
     }
     return this.join

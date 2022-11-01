@@ -13,12 +13,12 @@ const transporter = nodemailer.createTransport({
   }
 })
 
-export function sendMail (email: string) {
+export function sendMail (email: string, vertificationCode: string) {
   const mailOptions: Mail.Options = {
     from: process.env.GMAIL_USER,
     to: email,
-    subject: 'miniTwi email vertification',
-    text: 'hello 驗證碼為 1234',
+    subject: 'Posquare email vertification',
+    text: `hello 驗證碼為 ${vertificationCode}`,
     attachments: []
   }
 

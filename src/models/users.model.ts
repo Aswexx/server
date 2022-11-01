@@ -87,10 +87,8 @@ async function createUser (data: registerData) {
       }
     })
 
-    await prisma.$disconnect()
     return result
   } catch (err) {
-    await prisma.$disconnect()
     console.error(err)
   }
 }
@@ -141,9 +139,6 @@ async function addFollow (updateInfo: FollowRelation) {
         followerId: updateInfo.followerId,
         followedId: updateInfo.followedId
       }
-      // include: {
-      //   follower: { select: { name: true } }
-      // }
     })
 
     return result
@@ -281,34 +276,6 @@ async function getGoogleUser (token: string) {
   }
 }
 
-// async function getPopUsers (userId: string, skip: number) {
-//   try {
-//     const users = await prisma.user.findMany({
-//       where: { id: { notIn: [userId] } },
-//       orderBy: {
-//         posts: {
-//           _count: 'desc'
-//         }
-//       },
-//       select: {
-//         id: true,
-//         name: true,
-//         avatarUrl: true,
-//         alias: true,
-//         followed: true
-//       },
-//       take: 10,
-//       skip
-//     })
-
-//     await prisma.$disconnect()
-//     return users
-//   } catch (err) {
-//     console.log(err)
-//     await prisma.$disconnect()
-//   }
-// }
-
 async function getAdmin (loginInfo: LoginInfo) {
   try {
     const hash = await prisma.loginInfo.findFirst({
@@ -344,7 +311,6 @@ export {
   getUsers,
   getGoogleUser,
   getAdmin,
-  // getPopUsers,
   findUniqueUser,
   addFollow,
   deleteFollow

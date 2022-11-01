@@ -9,7 +9,9 @@ import {
 } from '../../models/comments.model'
 import { createNotif, NotifType } from '../../models/notif.model'
 import { interactEE } from '../../notificationSocket'
+import { redisClient } from '../../services/redis'
 import { addNewFileToS3, getFileFromS3 } from '../../services/s3'
+import { Mutex } from '../../util/mutex'
 
 async function httpCreatComment (req: Request, res: Response) {
   const newComment = req.body
@@ -25,8 +27,6 @@ async function httpCreatComment (req: Request, res: Response) {
   }
 
   const result = await createComment(newComment)
-  // TODO: set notif
-  console.log('❤️', result)
   if (result && result.onPost && result.postId) {
     const notif = await createNotif({
       receiverId: result.onPost.authorId,
@@ -44,25 +44,50 @@ async function httpCreatComment (req: Request, res: Response) {
     })
     interactEE.emit(NotifType.replyComment, notif)
   }
+
+  if (result && result.media) {
+    result.media.url = await getFileFromS3(result.media.url)
+  }
   res.json(result)
 }
 
 async function httpGetUserComments (req: Request, res: Response) {
   const { userId } = req.params
 
+  const cacheKey = `recentComments:${userId}`
+  const cacheResult = await redisClient.get(cacheKey)
+  const mutex = new Mutex()
+
+  if (cacheResult) {
+    return res.json(JSON.parse(cacheResult))
+  } else {
+    const cacheResult = await mutex.lock(cacheKey)
+    if (cacheResult) {
+      mutex.releaseLock(cacheKey)
+      return res.json(JSON.parse(cacheResult))
+    }
+  }
+
   const comments = await getComments(userId)
   if (comments && comments.length) {
     const avatarUrl = await getFileFromS3(comments[0].author.avatarUrl)
-    comments.forEach(comment => {
+    comments.forEach((comment) => {
       comment.author.avatarUrl = avatarUrl
     })
   }
+
+  await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(comments))
+  mutex.releaseLock(cacheKey)
   res.json(comments)
 }
 
 async function httpGetComment (req: Request, res: Response) {
   const { commentId } = req.params
   const result = await getComment(commentId)
+  if (result) {
+    const avatarUrl = await getFileFromS3(result.author.avatarUrl)
+    result.author.avatarUrl = avatarUrl
+  }
   res.json(result)
 }
 
@@ -70,17 +95,18 @@ async function httpGetAttatchComments (req: Request, res: Response) {
   const { commentId } = req.params
   const comments = await getAttatchComments(commentId)
 
-  // TODO: need avoid make duplicate requset to S3 because of same filekey
   if (comments) {
-    await Promise.all(comments.map(async (comment) => {
-      const fileKey = comment.author.avatarUrl
-      if (!/^https/.exec(fileKey)) {
-        const avatarUrl = await getFileFromS3(fileKey)
-        comment.author.avatarUrl = avatarUrl
-      }
+    await Promise.all(
+      comments.map(async (comment) => {
+        const fileKey = comment.author.avatarUrl
+        if (!/^https/.exec(fileKey)) {
+          const avatarUrl = await getFileFromS3(fileKey)
+          comment.author.avatarUrl = avatarUrl
+        }
 
-      return comment
-    }))
+        return comment
+      })
+    )
   }
   res.json(comments)
 }

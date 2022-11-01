@@ -130,10 +130,10 @@ model LikeComment {
 
 model FollowingShip {
   id         String @id @default(uuid()) @db.Char(36)
-  follower   User   @relation("follow", fields: [followerId], references: [id])
+  follower   User   @relation("follow", fields: [followerId], references: [id], onDelete: Cascade)
   followerId String @map("follower_id")
 
-  followed   User   @relation("followed", fields: [followedId], references: [id])
+  followed   User   @relation("followed", fields: [followedId], references: [id], onDelete: Cascade)
   followedId String @map("followed_id")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -166,12 +166,12 @@ model Notification {
 
   isRead Boolean @default(false)
 
-  receiver   User   @relation("receive", fields: [receiverId], references: [id])
+  receiver   User   @relation("receive", fields: [receiverId], references: [id], onDelete: Cascade)
   receiverId String @map("receiver_id")
 
   notifType NotifType @map("notif_type")
 
-  informer   User   @relation("inform", fields: [informerId], references: [id])
+  informer   User   @relation("inform", fields: [informerId], references: [id], onDelete: Cascade)
   informerId String @map("informer_id")
 
   targetPost   Post?

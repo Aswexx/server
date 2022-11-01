@@ -37,8 +37,6 @@ const postSelector = {
   }
 }
 
-// TODO: try abstract
-
 async function getPosts (skip: number, take: number, order: string) {
   console.log('😅😅', skip, take, order)
   const postCount = await prisma.post.count()
@@ -324,7 +322,6 @@ interface Post {
   fileKey?: string
   mediaType?: string
 }
-// TODO: intergate Class PostData and CommentData
 
 class PostData {
   constructor (public post: Post) { }
@@ -358,11 +355,9 @@ async function getPost (postId: string) {
       select: postSelector
     })
 
-    await prisma.$disconnect()
     return result
   } catch (e) {
     console.error(e)
-    await prisma.$disconnect()
   }
 }
 
