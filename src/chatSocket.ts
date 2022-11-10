@@ -3,11 +3,35 @@ import {
   setChatRoom,
   checkRoomExist,
   saveMsgRecord,
-  loadChatRecord
+  loadChatRecord,
+  getCachePersistentChatRecord,
+  setCachePersistentChatRecord
 } from './services/redis'
 import crypto from 'crypto'
+import { PrismaClient } from '@prisma/client'
+const prisma = new PrismaClient()
 
 const uid = () => crypto.randomBytes(8).toString('hex')
+
+async function getPersistentChatRecord (triggerUser: string, targetUser: string) {
+  const key = `${triggerUser}${targetUser}`
+  const cacheChatRecord = await getCachePersistentChatRecord(key)
+  if (cacheChatRecord) return cacheChatRecord
+  const persistentChatRecord = await prisma.chatRecord.findMany({
+    where: {
+      OR: [
+        { senderId: triggerUser, chatTargetId: targetUser },
+        { senderId: targetUser, chatTargetId: triggerUser }
+      ]
+    },
+    orderBy: { createdAt: 'asc' }
+  })
+  if (persistentChatRecord.length) {
+    await setCachePersistentChatRecord(key, persistentChatRecord)
+  }
+
+  return persistentChatRecord
+}
 
 function chatSocket (io: Server) {
   const chat = io.of('/chat')
@@ -15,21 +39,35 @@ function chatSocket (io: Server) {
     console.log(`a user connect to chat socket. id: ${socket.id}`)
 
     socket.on('startChat', async (roomInfo) => {
-      const { triggerUser, targetUser } = roomInfo
-      console.log(triggerUser, targetUser)
+      const { triggerUser, targetUser, isTriggerUserSponsor } = roomInfo
+      let persistentChatRecord
+      console.log(triggerUser, targetUser, isTriggerUserSponsor)
+      // * if triggerUser is sponsor then try to get persistent chat record first
+      if (isTriggerUserSponsor) {
+        persistentChatRecord = await getPersistentChatRecord(triggerUser, targetUser)
+      }
+
       // * check is chat room exist or using new unique roomId then load chat record
       const key = JSON.stringify({ triggerUser, targetUser })
       const existRoomId = await checkRoomExist(key)
       let roomId
+      let mappedPersistentChatRecord
+      if (persistentChatRecord) {
+        mappedPersistentChatRecord = persistentChatRecord.map(
+          (e: object) => JSON.stringify(e)
+        )
+      }
+
       if (existRoomId) {
         roomId = existRoomId
-        const chatRecord = await loadChatRecord(existRoomId)
+        let chatRecord = await loadChatRecord(existRoomId)
+        if (mappedPersistentChatRecord) {
+          chatRecord = [...mappedPersistentChatRecord, ...chatRecord]
+        }
         socket.emit('existRoomId', { existRoomId, chatRecord })
-        console.log('🚩🚩found exist room', roomId)
       } else {
         roomId = uid()
-        socket.emit('existRoomId', { existRoomId: roomId, chatRecord: [] })
-        console.log('🐶create new room', roomId)
+        socket.emit('existRoomId', { existRoomId: roomId, chatRecord: mappedPersistentChatRecord || [] })
       }
 
       socket.join(roomId)
@@ -37,13 +75,26 @@ function chatSocket (io: Server) {
     })
 
     socket.on('joinRoom', async (roomInfo) => {
-      const key = JSON.stringify(roomInfo)
+      const { triggerUser, targetUser, isTargetUserSponsor } = roomInfo
+      const key = JSON.stringify({ triggerUser, targetUser })
+      let persistentChatRecord
       const roomId = await checkRoomExist(key)
       if (!roomId) return
-      console.log('join room Id:', roomId)
-      const chatRecord = await loadChatRecord(roomId)
+      console.log('join room Id:', roomId, isTargetUserSponsor)
+      // * if reciever is sponsor then try to get persistent chat record first
+      if (isTargetUserSponsor) {
+        persistentChatRecord = await getPersistentChatRecord(triggerUser, targetUser)
+      }
+      // ******
 
-      console.log('@@@chatRecord', chatRecord)
+      let mappedPersistentChatRecord
+      let chatRecord = await loadChatRecord(roomId)
+      if (persistentChatRecord) {
+        mappedPersistentChatRecord = persistentChatRecord.map((e: object) =>
+          JSON.stringify(e)
+        )
+        chatRecord = [...mappedPersistentChatRecord, ...chatRecord]
+      }
 
       socket.join(roomId)
       socket.emit('checkRoomId', { roomId, chatRecord })
@@ -52,7 +103,6 @@ function chatSocket (io: Server) {
     socket.on('leaveRoom', async (chatRecord) => {
       const { roomId } = chatRecord
       socket.leave(roomId)
-      console.log('@@leave Room: ', roomId)
     })
 
     socket.on('changeRoom', async (roomInfo) => {
@@ -66,7 +116,6 @@ function chatSocket (io: Server) {
       const { roomId, message, createdTime } = msgInfo
       socket.in(roomId).emit('newMsg', { message, createdTime })
       await saveMsgRecord(msgInfo)
-      console.log('❤️msg saved ', roomId, message)
     })
 
     socket.on('disconnect', (reason) => {

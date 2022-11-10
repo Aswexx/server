@@ -1,26 +1,31 @@
 import { NextFunction, Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
+import { redisClient } from '../services/redis'
 
-const refreshTokenList: string[] = [] // save to Redis
+// const refreshTokenList: string[] = [] // save to Redis
 const accessTokenExp: { expiresIn: number | string | undefined } =
-  { expiresIn: 30 * 60 }
+  { expiresIn: 0.5 * 60 }
 
-function generateTokensThenSetCookie (userInfo: any, res: Response) {
+const refreshTokenExp: { expiresIn: number | string | undefined } = {
+  expiresIn: 60 * 60
+}
+
+async function generateTokensThenSetCookie (userInfo: any, res: Response) {
   if (!process.env.REFRESH_TOKEN_SECRET ||
     !process.env.ACCESS_TOKEN_SECRET) throw new Error('env variable not defined')
 
   const payload = { id: userInfo.id }
-  const refreshToken = jwt.sign(payload, process.env.REFRESH_TOKEN_SECRET)
+  const refreshToken = jwt.sign(payload, process.env.REFRESH_TOKEN_SECRET, refreshTokenExp)
   const accessToken = jwt.sign(payload, process.env.ACCESS_TOKEN_SECRET, accessTokenExp)
 
   setCookieWithTokens(refreshToken, accessToken, res)
-  refreshTokenList.push(refreshToken)
-
+  // refreshTokenList.push(refreshToken)
+  // console.log('🐶🐶', refreshTokenList)
+  await redisClient.sAdd('refreshTokenList', refreshToken)
   return { refreshToken, accessToken }
 }
 
 function setCookieWithTokens (refreshToken: string, accessToken: string, res: Response) {
-  console.log(refreshTokenList)
   res.cookie('reToken', refreshToken, {
     httpOnly: true,
     secure: true
@@ -32,23 +37,7 @@ function setCookieWithTokens (refreshToken: string, accessToken: string, res: Re
   })
 }
 
-// function isAuthenticated (req: Request, res: Response, next: NextFunction): void {
-//   // TODO: intergrate google and normal login
-//   const isGoogleLoggedIn = req.isAuthenticated() && req.user
-//   const isNormalLoggedIn = req.cookies.acToken && req.cookies.reToken
-
-//   if (!isGoogleLoggedIn && !isNormalLoggedIn) {
-//     console.log('user not logged in')
-//     res.sendStatus(401)
-//     return
-//   }
-//   console.log('user logged checked')
-//   console.log(req.user)
-
-//   next()
-// }
-
-function authenticateToken (req: Request, res: Response, next: NextFunction) {
+async function authenticateToken (req: Request, res: Response, next: NextFunction) {
   const acToken = req.cookies.acToken
   const refreshToken = req.cookies.reToken
   if (!acToken) {
@@ -59,13 +48,17 @@ function authenticateToken (req: Request, res: Response, next: NextFunction) {
 
     next()
   } catch (err) {
-    console.log('❌❌', err)
-    console.log(refreshTokenList)
-    if (!refreshTokenList.includes(refreshToken)) {
-      console.log('🗺️', 'Not Existed')
+    console.log('❌❌', err, 'accessToken not valid or expired')
+    const refreshTokenList = await redisClient.sMembers('refreshTokenList')
+    console.log('🔑🔑checking refreshTokenList', refreshTokenList)
+    // if (!refreshTokenList.includes(refreshToken)) {
+    //   console.log('🗺️', 'RefreshToken Not Existed')
+    //   return res.sendStatus(401)
+    // }
+    if (!(await redisClient.sIsMember('refreshTokenList', refreshToken))) {
+      console.log('🗺️', 'RefreshToken Not Existed')
       return res.sendStatus(401)
     }
-
     const newAccessToken = tokenRefresh(refreshToken, res)
     res.cookie('acToken', newAccessToken, {
       httpOnly: true,
@@ -77,7 +70,7 @@ function authenticateToken (req: Request, res: Response, next: NextFunction) {
 
 function tokenRefresh (refreshToken: string, res: Response) {
   try {
-    console.log('start exchanging......')
+    console.log('start to refresh token......')
     jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET as string)
     const decoded = jwt.decode(refreshToken, { json: true })
     if (decoded) {
@@ -85,14 +78,14 @@ function tokenRefresh (refreshToken: string, res: Response) {
       return jwt.sign(decoded, process.env.ACCESS_TOKEN_SECRET as string, accessTokenExp)
     }
   } catch (err) {
-    console.log(err)
-    return res.status(401)
+    console.error(err)
+    return res.sendStatus(401)
   }
 }
 
 export {
   generateTokensThenSetCookie,
-  authenticateToken,
-  refreshTokenList
+  authenticateToken
+  // refreshTokenList
   // isAuthenticated
 }

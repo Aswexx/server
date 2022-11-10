@@ -18,7 +18,7 @@ export function sendMail (email: string, vertificationCode: string) {
     from: process.env.GMAIL_USER,
     to: email,
     subject: 'Posquare email vertification',
-    text: `hello 驗證碼為 ${vertificationCode}`,
+    text: `您的驗證碼為 ${vertificationCode}`,
     attachments: []
   }
 

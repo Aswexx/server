@@ -8,16 +8,23 @@ import {
   updateUser,
   addFollow,
   deleteFollow,
-  getGoogleUser
+  getGoogleUser,
+  updateSponsor
 } from '../../models/users.model'
 import { createNotif, NotifType } from '../../models/notif.model'
 import { sendMail } from '../../services/gmail'
 import { hashSync } from '../../util/bcrypt'
-import { generateTokensThenSetCookie, refreshTokenList } from '../../util/tokens'
-import { interactEE } from './../../notificationSocket'
+import {
+  generateTokensThenSetCookie
+} from '../../util/tokens'
+import { interactEE, sponsorPaidEE } from './../../notificationSocket'
 import { addNewFileToS3, getFileFromS3 } from '../../services/s3'
 import crypto from 'crypto'
-import { compareEmailVertificationCodeThenCreate, redisClient, saveEmailVertificationCodeAndTempData } from '../../services/redis'
+import {
+  compareEmailVertificationCodeThenCreate,
+  redisClient,
+  saveEmailVertificationCodeAndTempData
+} from '../../services/redis'
 import { Mutex } from '../../util/mutex'
 
 const getVertificationCode = (bytes = 4) =>
@@ -39,7 +46,9 @@ async function waitForEmailVertification (req: Request, res: Response) {
 async function httpEmailVertification (req: Request, res: Response) {
   const { vertifyCode } = req.body
   console.log(vertifyCode)
-  const userDataToCreate = await compareEmailVertificationCodeThenCreate(vertifyCode)
+  const userDataToCreate = await compareEmailVertificationCodeThenCreate(
+    vertifyCode
+  )
   if (!userDataToCreate) {
     return res.status(400).json('驗證碼錯誤或失效，請重新嘗試註冊')
   }
@@ -88,15 +97,18 @@ async function httpDeleteFollow (req: Request, res: Response) {
 }
 
 async function httpGetUser (req: Request, res: Response) {
-  const cacheKey = `userData:${req.params.userId}`
+  const { account, password } = req.body
+  const cacheKey = `userDataKey:${account}`
   const cacheResult = await redisClient.get(cacheKey)
   const mutex = new Mutex()
   if (cacheResult) {
+    generateTokensThenSetCookie(cacheResult, res)
     return res.json(JSON.parse(cacheResult))
   } else {
     const cacheResult = await mutex.lock(cacheKey)
     if (cacheResult) {
       mutex.releaseLock(cacheKey)
+      generateTokensThenSetCookie(cacheResult, res)
       return res.json(JSON.parse(cacheResult))
     }
   }
@@ -108,15 +120,19 @@ async function httpGetUser (req: Request, res: Response) {
     })
     // * get image from S3 using file key
     if (result) {
-      if (!/^https/.exec(result.avatarUrl)) { result.avatarUrl = await getFileFromS3(result.avatarUrl) }
-      if (!/^https/.exec(result.bgImageUrl)) { result.bgImageUrl = await getFileFromS3(result.bgImageUrl) }
+      if (!/^https/.exec(result.avatarUrl)) {
+        result.avatarUrl = await getFileFromS3(result.avatarUrl)
+      }
+      if (!/^https/.exec(result.bgImageUrl)) {
+        result.bgImageUrl = await getFileFromS3(result.bgImageUrl)
+      }
     }
     // ***
     await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(result))
     mutex.releaseLock(cacheKey)
     return res.json(result)
   }
-  const { account, password } = req.body
+
   const result = await getUser({ isLoginUser: true }, { account, password })
   if (!result) {
     await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(result))
@@ -124,18 +140,19 @@ async function httpGetUser (req: Request, res: Response) {
     return res.json(result)
   }
   generateTokensThenSetCookie(result, res)
-
   await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(result))
   mutex.releaseLock(cacheKey)
   res.json(result)
 }
 
 async function httpUpdateUser (req: Request, res: Response) {
-  const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined
+  const files = req.files as
+    | { [fieldname: string]: Express.Multer.File[] }
+    | undefined
   const text = req.body
   const { userId } = req.params
 
-  let s3FileKeys: {backgroundImageKey?: string, avatarKey?: string} = {}
+  let s3FileKeys: { backgroundImageKey?: string; avatarKey?: string } = {}
   if ((files && files.backgroundImage) || (files && files.avatarImage)) {
     if (!files.backgroundImage) {
       const file = {
@@ -153,13 +170,15 @@ async function httpUpdateUser (req: Request, res: Response) {
       s3FileKeys.backgroundImageKey = backgroundImageKey
     } else {
       const imageProps = Object.keys(files)
-      const promises = await Promise.all(imageProps.map(async (prop) => {
-        const file = {
-          Body: files[prop][0].buffer,
-          ContentType: files[prop][0].mimetype
-        }
-        return await addNewFileToS3(file)
-      }))
+      const promises = await Promise.all(
+        imageProps.map(async (prop) => {
+          const file = {
+            Body: files[prop][0].buffer,
+            ContentType: files[prop][0].mimetype
+          }
+          return await addNewFileToS3(file)
+        })
+      )
 
       s3FileKeys = {
         backgroundImageKey: promises[0],
@@ -188,7 +207,6 @@ async function httpGetGoolgeUser (req: Request, res: Response) {
   const { token } = req.body
   const user = await getGoogleUser(token)
   generateTokensThenSetCookie(user, res)
-
   res.json(user)
 }
 
@@ -199,15 +217,21 @@ async function httpGetAdmin (req: Request, res: Response) {
   if (!result) {
     return res.sendStatus(401)
   }
-
   generateTokensThenSetCookie(result, res)
-
   res.json(result)
 }
 
-function httpLogout (req: Request, res: Response) {
+async function httpUpdateSponsor (req: Request, res: Response) {
+  const { userId } = req.body
+  const updatedUser = await updateSponsor(userId)
+  await redisClient.del(`userData:${updatedUser!.email}`)
+  sponsorPaidEE.emit('paid')
+  res.redirect('http://localhost:8080/#/pay-confirmed')
+}
+
+async function httpLogout (req: Request, res: Response) {
   const refreshToken = req.cookies.reToken
-  refreshTokenList.splice(refreshTokenList.indexOf(refreshToken), 1)
+  await redisClient.sRem('refreshTokenList', refreshToken)
   res.json('ok')
 }
 
@@ -222,5 +246,6 @@ export {
   httpAddFollow,
   httpDeleteFollow,
   httpGetGoolgeUser,
+  httpUpdateSponsor,
   httpLogout
 }

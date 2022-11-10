@@ -1,4 +1,5 @@
 import express from 'express'
+import { linePay, payCancel, payConfirm } from '../../services/linePay'
 import { parseFormDataText, uploadProfileImages } from '../../util/multer'
 // import { setMaxAgeCache } from '../../util/cache-control'
 import {
@@ -13,7 +14,8 @@ import {
   httpLogout,
   httpGetUsers,
   httpAddFollow,
-  httpDeleteFollow
+  httpDeleteFollow,
+  httpUpdateSponsor
 } from './users.controller'
 
 const usersRouter = express.Router()
@@ -35,5 +37,10 @@ usersRouter.post('/', parseFormDataText, waitForEmailVertification)
 // * followship
 usersRouter.delete('/follow/:followshipId', httpDeleteFollow)
 usersRouter.post('/follow', httpAddFollow)
+
+// * sponsor
+usersRouter.post('/sponsor', linePay)
+usersRouter.get('/sponsor/confirm', payConfirm, httpUpdateSponsor)
+usersRouter.post('/sponsor/cancel', payCancel)
 
 export { usersRouter }

@@ -36,6 +36,8 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @map("updated_at")
 
+  isSponsor Boolean @default(false) @map("is_sponsor")
+
   posts         Post[]
   comments      Comment[]
   likePosts     LikePost[]
@@ -196,7 +198,7 @@ model ChatRecord {
   chatTarget   User   @relation("chatTarget", fields: [chatTargetId], references: [id])
   chatTargetId String @map("chat_target_id")
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @map("created_at")
 
   @@map("chat_records")
 }

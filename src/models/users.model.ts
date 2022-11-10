@@ -39,7 +39,7 @@ async function getUsers () {
         follow: true,
         followed: true
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: [{ isSponsor: 'desc' }, { posts: { _count: 'desc' } }, { createdAt: 'asc' }]
     })
 
     // * 以是否直接放http url 區分假帳號與真實創建，後者需要再把 s3 key 轉成暫時性 url
@@ -61,8 +61,7 @@ async function getUsers () {
 
     return result
   } catch (err) {
-    await prisma.$disconnect()
-    console.log(err)
+    console.error(err)
   }
 }
 
@@ -213,7 +212,6 @@ async function getUser (userState: UserState, loginInfo?: LoginInfo) {
       }
     })
 
-    // * 以是否直接放http url 區分假帳號與真實創建，後者需要再把 s3 key 轉成暫時性 url
     if (user && !/^https/.exec(user.avatarUrl)) {
       const urls = await Promise.all(
         [
@@ -296,10 +294,22 @@ async function getAdmin (loginInfo: LoginInfo) {
       }
     })
 
-    await prisma.$disconnect()
     return admin
   } catch (err) {
-    await prisma.$disconnect()
+    console.error(err)
+  }
+}
+
+async function updateSponsor (userId: string) {
+  try {
+    const result = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        isSponsor: true
+      }
+    })
+    return result
+  } catch (err) {
     console.error(err)
   }
 }
@@ -313,5 +323,6 @@ export {
   getAdmin,
   findUniqueUser,
   addFollow,
-  deleteFollow
+  deleteFollow,
+  updateSponsor
 }

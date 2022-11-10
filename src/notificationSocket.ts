@@ -8,6 +8,7 @@ import {
 import schedule from 'node-schedule'
 
 const pushOnlineUsersEE = new EventEmitter()
+const sponsorPaidEE = new EventEmitter()
 const interactEE = new EventEmitter()
 
 // * push onlineUsers at the 30th second of every minute
@@ -26,6 +27,7 @@ function notificationSocket (io: Server) {
     })
 
     socket.on('setOnlineUser', async (userId) => {
+      console.log('😅⭕', `setOnlineUser: ${userId}`)
       await setOnlineUser(socket.id, userId)
     })
 
@@ -70,6 +72,13 @@ function notificationSocket (io: Server) {
         notification.in(listeningUserId).emit('notification', notif)
       }
 
+      function publishUpdateSponsorState () {
+        notification.in(listeningUserId).emit('paid')
+        sponsorPaidEE.removeListener('paid', publishUpdateSponsorState)
+      }
+
+      sponsorPaidEE.on('paid', publishUpdateSponsorState)
+
       interactEE.on('follow', followHandler)
       interactEE.on('inviteChat', inviteChatHandler)
       interactEE.on('replyPost', replyPostHandler)
@@ -94,5 +103,6 @@ function notificationSocket (io: Server) {
 
 export {
   interactEE,
+  sponsorPaidEE,
   notificationSocket
 }
