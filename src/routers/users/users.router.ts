@@ -11,6 +11,7 @@ import {
   httpGetAdmin,
   httpUpdateUser,
   httpGetGoolgeUser,
+  httpGetNormalLoginUser,
   httpLogout,
   httpGetUsers,
   httpAddFollow,
@@ -26,7 +27,7 @@ usersRouter.patch('/:userId', uploadProfileImages, httpUpdateUser)
 
 // *includs authenticate refresh token
 usersRouter.post('/google', httpGetGoolgeUser)
-usersRouter.post('/normal', httpGetUser)
+usersRouter.post('/normal', httpGetNormalLoginUser)
 usersRouter.post('/admin', httpGetAdmin)
 
 usersRouter.get('/', httpGetUsers)

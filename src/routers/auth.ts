@@ -1,6 +1,9 @@
 import express, { Express, Request, Response, NextFunction } from 'express'
 import passport from 'passport'
 import { Strategy, StrategyOptionsWithRequest, VerifyCallback, Profile } from 'passport-google-oauth20'
+import jwt from 'jsonwebtoken'
+import { getUser } from '../models/users.model'
+import { authenticateToken } from '../util/tokens'
 // import { upsertUser } from '../models/users.model'
 require('dotenv').config()
 
@@ -120,17 +123,28 @@ authRouter.get('/secret', checkLoggedIn, hasPermission, (_req: Request, res: Res
   res.send('Secret Value is 53!')
 })
 
-authRouter.get('/auth', (req: Request, res: Response) => {
-  // res.send(`
-  //   <h1>Hi!</h1>
-  //   <a href='/secret'>Take Secret</a>
-  //   <br>
-  //   <a href='/auth/google'>google sign in</a>
-  //   <br>
-  //   <a href='/auth/logout'>google sign out</a>
-  // `)
-  // console.log(__dirname)
-  // res.sendFile('index.html')
-  res.redirect('/auth/google')
-  // res.json({ success: true })
+// authRouter.get('/auth', async (req: Request, res: Response) => {
+//   const acToken = req.cookies.acToken
+//   try {
+//     jwt.verify(acToken, process.env.ACCESS_TOKEN_SECRET as string)
+//     const decoded = jwt.decode(acToken, { complete: true })
+//     // @ts-ignore
+//     const userId = decoded!.payload.id
+//     console.log('😅userId', userId)
+//     const user = await getUser(userId)
+//     res.json(user)
+//   } catch (err) {
+//     console.error(err)
+//     res.sendStatus(401)
+//   }
+// })
+
+authRouter.get('/auth', authenticateToken, async (req: Request, res: Response) => {
+  const acToken = req.cookies.acToken
+  const decoded = jwt.decode(acToken, { complete: true })
+  // @ts-ignore
+  const userId = decoded!.payload.id
+  console.log('😅userId', userId)
+  const user = await getUser(userId)
+  res.json(user)
 })

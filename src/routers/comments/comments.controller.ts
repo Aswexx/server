@@ -34,7 +34,8 @@ async function httpCreatComment (req: Request, res: Response) {
       targetPostId: result.postId,
       notifType: NotifType.replyPost
     })
-    interactEE.emit(NotifType.replyPost, notif)
+    // interactEE.emit(NotifType.replyPost, notif)
+    interactEE.emit('interact', notif)
   } else if (result && result.onComment && result.onCommentId) {
     const notif = await createNotif({
       receiverId: result.onComment.authorId,
@@ -42,7 +43,8 @@ async function httpCreatComment (req: Request, res: Response) {
       targetCommentId: result.onCommentId,
       notifType: NotifType.replyComment
     })
-    interactEE.emit(NotifType.replyComment, notif)
+    // interactEE.emit(NotifType.replyComment, notif)
+    interactEE.emit('interact', notif)
   }
 
   if (result && result.media) {
@@ -123,7 +125,7 @@ async function httpUpdateLikeComment (req: Request, res: Response) {
         targetCommentId: result.commentId,
         notifType: NotifType.likeComment
       })
-      interactEE.emit(NotifType.likeComment, notif)
+      interactEE.emit('interact', notif)
     }
   } else {
     result = await deleteLikeComment(likeCommentInfo)

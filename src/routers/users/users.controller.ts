@@ -9,7 +9,8 @@ import {
   addFollow,
   deleteFollow,
   getGoogleUser,
-  updateSponsor
+  updateSponsor,
+  checkLoginInfo
 } from '../../models/users.model'
 import { createNotif, NotifType } from '../../models/notif.model'
 import { sendMail } from '../../services/gmail'
@@ -26,6 +27,7 @@ import {
   saveEmailVertificationCodeAndTempData
 } from '../../services/redis'
 import { Mutex } from '../../util/mutex'
+import jwt from 'jsonwebtoken'
 
 const getVertificationCode = (bytes = 4) =>
   crypto.randomBytes(bytes).toString('hex')
@@ -85,7 +87,7 @@ async function httpAddFollow (req: Request, res: Response) {
     notifType: NotifType.follow
   })
 
-  interactEE.emit('follow', notif)
+  interactEE.emit('interact', notif)
 
   res.json(followship)
 }
@@ -96,54 +98,86 @@ async function httpDeleteFollow (req: Request, res: Response) {
   res.json(romovedFollowship)
 }
 
-async function httpGetUser (req: Request, res: Response) {
+async function httpGetNormalLoginUser (req: Request, res: Response) {
   const { account, password } = req.body
-  const cacheKey = `userDataKey:${account}`
+  if (await checkLoginInfo(account, password)) {
+    const user = await getUser(account)
+    generateTokensThenSetCookie(user, res)
+    res.json(user)
+  } else {
+    res.json('')
+  }
+}
+
+async function httpGetUser (req: Request, res: Response) {
+  const userId = req.params.userId
+  const cacheKey = `userDataKey:${userId}`
   const cacheResult = await redisClient.get(cacheKey)
   const mutex = new Mutex()
   if (cacheResult) {
-    generateTokensThenSetCookie(cacheResult, res)
     return res.json(JSON.parse(cacheResult))
   } else {
     const cacheResult = await mutex.lock(cacheKey)
     if (cacheResult) {
       mutex.releaseLock(cacheKey)
-      generateTokensThenSetCookie(cacheResult, res)
       return res.json(JSON.parse(cacheResult))
     }
   }
 
-  if (!Object.hasOwn(req.body, 'account')) {
-    const result = await getUser({
-      id: req.params.userId,
-      isLoginUser: false
-    })
-    // * get image from S3 using file key
-    if (result) {
-      if (!/^https/.exec(result.avatarUrl)) {
-        result.avatarUrl = await getFileFromS3(result.avatarUrl)
-      }
-      if (!/^https/.exec(result.bgImageUrl)) {
-        result.bgImageUrl = await getFileFromS3(result.bgImageUrl)
-      }
-    }
-    // ***
-    await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(result))
-    mutex.releaseLock(cacheKey)
-    return res.json(result)
-  }
-
-  const result = await getUser({ isLoginUser: true }, { account, password })
-  if (!result) {
-    await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(result))
-    mutex.releaseLock(cacheKey)
-    return res.json(result)
-  }
-  generateTokensThenSetCookie(result, res)
+  const result = await getUser(userId)
   await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(result))
   mutex.releaseLock(cacheKey)
-  res.json(result)
+  return res.json(result)
 }
+
+// async function httpGetUser (req: Request, res: Response) {
+//   const { account, password } = req.body
+//   const cacheKey = `userDataKey:${account}`
+//   const cacheResult = await redisClient.get(cacheKey)
+//   const mutex = new Mutex()
+//   if (cacheResult) {
+//     generateTokensThenSetCookie(cacheResult, res)
+//     return res.json(JSON.parse(cacheResult))
+//   } else {
+//     const cacheResult = await mutex.lock(cacheKey)
+//     if (cacheResult) {
+//       mutex.releaseLock(cacheKey)
+//       generateTokensThenSetCookie(cacheResult, res)
+//       return res.json(JSON.parse(cacheResult))
+//     }
+//   }
+
+//   if (!Object.hasOwn(req.body, 'account')) {
+//     const result = await getUser({
+//       id: req.params.userId,
+//       isLoginUser: false
+//     })
+//     // * get image from S3 using file key
+//     if (result) {
+//       if (!/^https/.exec(result.avatarUrl)) {
+//         result.avatarUrl = await getFileFromS3(result.avatarUrl)
+//       }
+//       if (!/^https/.exec(result.bgImageUrl)) {
+//         result.bgImageUrl = await getFileFromS3(result.bgImageUrl)
+//       }
+//     }
+//     // ***
+//     await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(result))
+//     mutex.releaseLock(cacheKey)
+//     return res.json(result)
+//   }
+
+//   const result = await getUser({ isLoginUser: true }, { account, password })
+//   if (!result) {
+//     await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(result))
+//     mutex.releaseLock(cacheKey)
+//     return res.json(result)
+//   }
+//   generateTokensThenSetCookie(result, res)
+//   await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(result))
+//   mutex.releaseLock(cacheKey)
+//   res.json(result)
+// }
 
 async function httpUpdateUser (req: Request, res: Response) {
   const files = req.files as
@@ -213,7 +247,7 @@ async function httpGetGoolgeUser (req: Request, res: Response) {
 async function httpGetAdmin (req: Request, res: Response) {
   const { account, password } = req.body
   console.log({ account, password })
-  const result = await getAdmin({ account, password })
+  const result = await getAdmin(account, password)
   if (!result) {
     return res.sendStatus(401)
   }
@@ -231,7 +265,12 @@ async function httpUpdateSponsor (req: Request, res: Response) {
 
 async function httpLogout (req: Request, res: Response) {
   const refreshToken = req.cookies.reToken
-  await redisClient.sRem('refreshTokenList', refreshToken)
+  const decoded = jwt.decode(refreshToken, { complete: true })
+  if (decoded) {
+    // @ts-ignore
+    const userId = decoded.payload.id
+    await redisClient.hDel('refreshTokenCollection', userId)
+  }
   res.json('ok')
 }
 
@@ -246,6 +285,7 @@ export {
   httpAddFollow,
   httpDeleteFollow,
   httpGetGoolgeUser,
+  httpGetNormalLoginUser,
   httpUpdateSponsor,
   httpLogout
 }

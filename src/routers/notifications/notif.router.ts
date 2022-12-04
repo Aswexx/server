@@ -7,6 +7,7 @@ import {
 const notifRouter = express.Router()
 
 notifRouter.get('/:userId', httpGetNotifs)
+// notifRouter.post('/mention', httpCreateMentionNotif)
 notifRouter.post('/', httpCreatNotif)
 
 export { notifRouter }

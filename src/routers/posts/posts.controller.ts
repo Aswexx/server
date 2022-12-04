@@ -13,7 +13,7 @@ import {
   deleteLikePost,
   deletePost
 } from '../../models/posts.model'
-import { createNotif, NotifType } from '../../models/notif.model'
+import { createMentionNotifsThenGet, createNotif, NotifType } from '../../models/notif.model'
 import { interactEE } from '../../notificationSocket'
 import { addNewFileToS3, getFileFromS3 } from '../../services/s3'
 import { redisClient } from '../../services/redis'
@@ -177,6 +177,10 @@ async function httpGetAllPostsCreatedAt (req: Request, res: Response) {
 
 async function httpCreatePost (req: Request, res: Response) {
   const newPost = req.body
+  console.log('😅😅😅', newPost)
+  const parsedTagedUsers = JSON.parse(newPost.tagedUsers)
+  const tagedUsers: string[] = Object.values(parsedTagedUsers)
+
   const file = {
     Body: req.file?.buffer,
     ContentType: req.file?.mimetype
@@ -192,7 +196,47 @@ async function httpCreatePost (req: Request, res: Response) {
     post.media.url = await getFileFromS3(post.media.url)
   }
 
-  console.log('@@@@', post)
+  if (post && tagedUsers.length) {
+    console.log(tagedUsers)
+    const notifs = tagedUsers.map((userId) => {
+      return {
+        receiverId: userId,
+        informerId: newPost.authorId,
+        targetPostId: post.id,
+        isRead: false,
+        notifType: NotifType.mention
+      }
+    })
+
+    console.log(notifs)
+
+    // const notifs = await createMentionNotifs({
+    //   receiverId: tagedUsers,
+    //   informerId: newPost.userId,
+    //   targetPostId: post.id,
+    //   notifType: NotifType.mention
+    // })
+    const notifsAfterCreate = await createMentionNotifsThenGet(notifs)
+    if (notifsAfterCreate) {
+      const infromerAvatarUrl = await getFileFromS3(notifsAfterCreate[0].informer.avatarUrl)
+      const mappedNotifs = await Promise.all(
+        notifsAfterCreate.map(async (notif) => {
+          return {
+            ...notif,
+            informer: {
+              name: notif.informer.name,
+              avatarUrl: infromerAvatarUrl
+            }
+          }
+        })
+      )
+
+      mappedNotifs.forEach((notif) => {
+        console.log('tagedUserNotif:', notif)
+        interactEE.emit('interact', notif)
+      })
+    }
+  }
 
   res.json(post)
 }
@@ -203,7 +247,6 @@ async function httpUpdateLikePost (req: Request, res: Response) {
   if (likeInfo.isLike) {
     result = await createLikePost(likeInfo)
     if (!result) return
-    console.log({ result })
 
     const notif = await createNotif({
       receiverId: result.post.authorId,
@@ -212,7 +255,7 @@ async function httpUpdateLikePost (req: Request, res: Response) {
       notifType: NotifType.likePost
     })
 
-    interactEE.emit(NotifType.likePost, notif)
+    interactEE.emit('interact', notif)
   } else {
     result = await deleteLikePost(likeInfo)
   }

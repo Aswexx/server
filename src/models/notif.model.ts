@@ -18,15 +18,13 @@ async function getNotifs (userId: string) {
       where: { receiverId: userId },
       include: {
         informer: {
-          select: { name: true }
+          select: { name: true, avatarUrl: true }
         }
       },
       orderBy: { createdAt: 'desc' }
     })
-    await prisma.$disconnect()
     return result
   } catch (err) {
-    await prisma.$disconnect()
     console.error(err)
   }
 }
@@ -42,20 +40,52 @@ async function createNotif (notifData: {[key: string]: string, notifType: NotifT
         notifType: notifData.notifType
       },
       include: {
-        informer: { select: { name: true } }
+        informer: { select: { name: true, avatarUrl: true } }
       }
     })
 
-    await prisma.$disconnect()
     return result
   } catch (e) {
     console.log(e)
-    await prisma.$disconnect()
+  }
+}
+
+interface MentionNotifData {
+  receiverId: string
+  informerId: string
+  targetPostId?: string
+  targetCommentId?: string
+  notifType: NotifType
+}
+
+async function createMentionNotifsThenGet (notifData: MentionNotifData[]) {
+  //* due to createMany func just return num of rows, so query again by findMany func.
+  try {
+    await prisma.notification.createMany({
+      data: notifData
+    })
+
+    return await prisma.notification.findMany({
+      where: {
+        informerId: notifData[0].informerId,
+        notifType: 'mention',
+        OR: [{ targetPostId: notifData[0].targetPostId }, { targetCommentId: notifData[0].targetCommentId }]
+      },
+      include: {
+        informer: {
+          select: { name: true, avatarUrl: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+  } catch (e) {
+    console.log(e)
   }
 }
 
 export {
   getNotifs,
   createNotif,
+  createMentionNotifsThenGet,
   NotifType
 }

@@ -9,11 +9,6 @@ interface registerData {
   [key: string]: string
 }
 
-interface LoginInfo {
-  account: string
-  password: string
-}
-
 function getRandomString (randomBytes: number): string {
   return require('crypto').randomBytes(randomBytes).toString('hex')
 }
@@ -58,6 +53,19 @@ async function getUsers () {
     }))
 
     // *****
+
+    return result
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+async function getUsersWithId () {
+  try {
+    const result = await prisma.user.findMany({
+      where: { role: 'normal' },
+      select: { id: true }
+    })
 
     return result
   } catch (err) {
@@ -162,46 +170,19 @@ async function deleteFollow (followShipId: string) {
   }
 }
 
-interface UserState {
-  id?: string,
-  isLoginUser: boolean
+async function checkLoginInfo (account: string, password: string) {
+  const hash = await prisma.loginInfo.findUnique({
+    where: { loginEmail: account }
+  })
+
+  if (!hash || !compareSync(password, hash.password)) return false
+  return true
 }
 
-async function getUser (userState: UserState, loginInfo?: LoginInfo) {
+async function getUser (userIdOrEmail: string) {
   try {
-    if (!userState.isLoginUser) {
-      return await prisma.user.findFirst({
-        where: {
-          id: userState.id
-        },
-        include: {
-          follow: {
-            where: { followerId: userState.id }
-          },
-          followed: {
-            where: { followedId: userState.id }
-          }
-        }
-      })
-    }
-
-    const { account, password } = loginInfo as LoginInfo
-
-    const hash = await prisma.loginInfo.findUnique({
-      where: { loginEmail: account },
-      select: { password: true }
-    })
-
-    if (!hash) throw new Error('Data not found')
-    if (!compareSync(password, hash.password)) {
-      return ''
-    }
-
     const user = await prisma.user.findFirst({
-      where: {
-        email: account,
-        role: 'normal'
-      },
+      where: { OR: [{ id: userIdOrEmail }, { email: userIdOrEmail }] },
       include: {
         follow: {
           select: { follower: true }
@@ -213,20 +194,17 @@ async function getUser (userState: UserState, loginInfo?: LoginInfo) {
     })
 
     if (user && !/^https/.exec(user.avatarUrl)) {
-      const urls = await Promise.all(
-        [
-          await getFileFromS3(user.bgImageUrl),
-          await getFileFromS3(user.avatarUrl)
-        ]
-      )
+      const urls = await Promise.all([
+        await getFileFromS3(user.bgImageUrl),
+        await getFileFromS3(user.avatarUrl)
+      ])
       user.bgImageUrl = urls[0]
       user.avatarUrl = urls[1]
     }
 
     return user
   } catch (err) {
-    console.log(err)
-    await prisma.$disconnect()
+    console.error(err)
   }
 }
 
@@ -263,33 +241,30 @@ async function getGoogleUser (token: string) {
 
     if (!user) {
       const newUser = await createUser({ email, name, picture, alias: `${name}_${getRandomString(4)}` })
-      await prisma.$disconnect()
       return newUser
     }
-    await prisma.$disconnect()
     return user
   } catch (err) {
     console.log(err)
-    await prisma.$disconnect()
   }
 }
 
-async function getAdmin (loginInfo: LoginInfo) {
+async function getAdmin (account: string, password: string) {
   try {
     const hash = await prisma.loginInfo.findFirst({
-      where: { loginEmail: loginInfo.account },
+      where: { loginEmail: account },
       select: { password: true }
     })
 
     if (!hash) throw new Error('Data not found')
-    if (!compareSync(loginInfo.password, hash.password)) {
+    if (!compareSync(password, hash.password)) {
       console.log('INVALID')
       return ''
     }
 
     const admin = await prisma.user.findFirst({
       where: {
-        email: loginInfo.account,
+        email: account,
         role: 'admin'
       }
     })
@@ -317,6 +292,7 @@ async function updateSponsor (userId: string) {
 export {
   createUser,
   updateUser,
+  checkLoginInfo,
   getUser,
   getUsers,
   getGoogleUser,
@@ -324,5 +300,6 @@ export {
   findUniqueUser,
   addFollow,
   deleteFollow,
-  updateSponsor
+  updateSponsor,
+  getUsersWithId
 }

@@ -1,5 +1,6 @@
 import { createClient } from 'redis'
 import { ChatRecord, PrismaClient } from '@prisma/client'
+import { getUsersWithId } from '../models/users.model'
 const prisma = new PrismaClient()
 
 const EXP_TIME = 10 * 60
@@ -11,6 +12,7 @@ const redisClient = createClient();
   try {
     await redisClient.connect()
     await subscriber.connect()
+    await initUsersOnlineState()
     redisClient.configSet('notify-keyspace-events', 'Ex')
     subscriber.subscribe('__keyevent@0__:expired', async (msgKey) => {
       console.log('@@@⚙️', msgKey)
@@ -38,16 +40,30 @@ const redisClient = createClient();
   }
 })()
 
-async function setOnlineUser (socketId: string, userId: string) {
-  await redisClient.hSet('onlineUsers', socketId, userId)
+async function initUsersOnlineState () {
+  // TODO: not to do db query if onlinestate exist
+  const users = await getUsersWithId()
+  users?.forEach(e => {
+    redisClient.hSet('onlineState', e.id, 0)
+  })
 }
 
-async function getOnlineUsers () {
-  return await redisClient.hVals('onlineUsers')
+async function setOnlineUserState (userId: string, socketId: string) {
+  await redisClient.hSet('onlineState', userId, 1)
+  await redisClient.hSet('socketInUse', socketId, userId)
 }
 
-async function removeOnlineUser (socketId: string) {
-  await redisClient.hDel('onlineUsers', socketId)
+async function updateOnlineUserState (socketId: string) {
+  const userId = await redisClient.hGet('socketInUse', socketId)
+  if (userId) {
+    await redisClient.hSet('onlineState', userId, 0)
+    await redisClient.hDel('socketInUse', socketId)
+    return await redisClient.hGetAll('onlineState')
+  }
+}
+
+async function getOnlineUserState () {
+  return await redisClient.hGetAll('onlineState')
 }
 
 async function setChatRoom (roomInfo: { triggerUser: string, targetUser: string, roomId: string }) {
@@ -137,9 +153,9 @@ async function getCachePersistentChatRecord (key: string) {
 }
 
 export {
-  setOnlineUser,
-  removeOnlineUser,
-  getOnlineUsers,
+  setOnlineUserState,
+  updateOnlineUserState,
+  getOnlineUserState,
   setChatRoom,
   saveMsgRecord,
   checkRoomExist,
