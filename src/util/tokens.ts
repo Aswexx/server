@@ -21,22 +21,21 @@ async function generateTokensThenSetCookie (userInfo: any, res: Response) {
   const accessToken = jwt.sign(payload, process.env.ACCESS_TOKEN_SECRET, accessTokenExp)
 
   setCookieWithTokens(refreshToken, accessToken, res)
-  // refreshTokenCollection.push(refreshToken)
-  // console.log('🐶🐶', refreshTokenCollection)
   await redisClient.hSet('refreshTokenCollection', userInfo.id, refreshToken)
   return { refreshToken, accessToken }
 }
 
 function setCookieWithTokens (refreshToken: string, accessToken: string, res: Response) {
+  console.log('setting cookies.........🔑🔑🔑🔑')
   res.cookie('reToken', refreshToken, {
     httpOnly: true,
-    secure: true,
+    // secure: true,
     maxAge: REFRESH_TOKEN_COOKIE_EXP
   })
 
   res.cookie('acToken', accessToken, {
-    httpOnly: true,
-    secure: true
+    httpOnly: true
+    // secure: true
   })
 }
 
@@ -51,6 +50,7 @@ async function authenticateToken (req: Request, res: Response, next: NextFunctio
   }
 
   try {
+    console.log('acToken & reToken:', acToken, refreshToken)
     jwt.verify(acToken, process.env.ACCESS_TOKEN_SECRET as string)
     next()
   } catch (err) {

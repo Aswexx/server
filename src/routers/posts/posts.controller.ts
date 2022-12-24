@@ -13,17 +13,17 @@ import {
   deleteLikePost,
   deletePost
 } from '../../models/posts.model'
-import { createMentionNotifsThenGet, createNotif, NotifType } from '../../models/notif.model'
-import { interactEE } from '../../notificationSocket'
+import { createNotif, NotifType } from '../../models/notif.model'
+import { interactEE, notificateTagedUsers } from '../../notificationSocket'
 import { addNewFileToS3, getFileFromS3 } from '../../services/s3'
-import { redisClient } from '../../services/redis'
+import { deleteUserCache, redisClient } from '../../services/redis'
 import { Mutex } from '../../util/mutex'
 
 async function httpGetPosts (req: Request, res: Response) {
   const { skipPostsCount, take, order, keyword } = req.query
   let results
 
-  const cacheKey = `${skipPostsCount}${take}${order}${keyword}`
+  const cacheKey = `homePosts:${skipPostsCount}${take}${order}${keyword}`
   const cacheResult = await redisClient.get(cacheKey)
   const mutex = new Mutex()
 
@@ -118,7 +118,7 @@ async function httpGetUserPosts (req: Request, res: Response) {
 async function httpGetUserLikePosts (req: Request, res: Response) {
   const { userId } = req.params
 
-  const cacheKey = `likePosts:${userId}`
+  const cacheKey = `recentLikePosts:${userId}`
   const cacheResult = await redisClient.get(cacheKey)
   const mutex = new Mutex()
 
@@ -177,7 +177,6 @@ async function httpGetAllPostsCreatedAt (req: Request, res: Response) {
 
 async function httpCreatePost (req: Request, res: Response) {
   const newPost = req.body
-  console.log('😅😅😅', newPost)
   const parsedTagedUsers = JSON.parse(newPost.tagedUsers)
   const tagedUsers: string[] = Object.values(parsedTagedUsers)
 
@@ -192,50 +191,17 @@ async function httpCreatePost (req: Request, res: Response) {
   }
 
   const post = await createPost(newPost)
-  if (post && post.media) {
-    post.media.url = await getFileFromS3(post.media.url)
-  }
-
-  if (post && tagedUsers.length) {
-    console.log(tagedUsers)
-    const notifs = tagedUsers.map((userId) => {
-      return {
-        receiverId: userId,
-        informerId: newPost.authorId,
-        targetPostId: post.id,
-        isRead: false,
-        notifType: NotifType.mention
-      }
-    })
-
-    console.log(notifs)
-
-    // const notifs = await createMentionNotifs({
-    //   receiverId: tagedUsers,
-    //   informerId: newPost.userId,
-    //   targetPostId: post.id,
-    //   notifType: NotifType.mention
-    // })
-    const notifsAfterCreate = await createMentionNotifsThenGet(notifs)
-    if (notifsAfterCreate) {
-      const infromerAvatarUrl = await getFileFromS3(notifsAfterCreate[0].informer.avatarUrl)
-      const mappedNotifs = await Promise.all(
-        notifsAfterCreate.map(async (notif) => {
-          return {
-            ...notif,
-            informer: {
-              name: notif.informer.name,
-              avatarUrl: infromerAvatarUrl
-            }
-          }
-        })
-      )
-
-      mappedNotifs.forEach((notif) => {
-        console.log('tagedUserNotif:', notif)
-        interactEE.emit('interact', notif)
-      })
+  if (post) {
+    if (post.media) {
+      post.media.url = await getFileFromS3(post.media.url)
     }
+
+    if (tagedUsers.length) {
+      await notificateTagedUsers(post, tagedUsers)
+    }
+
+    // * delete redis cache matches specific pattern
+    await deleteUserCache('Posts', post.author.id)
   }
 
   res.json(post)
@@ -260,14 +226,22 @@ async function httpUpdateLikePost (req: Request, res: Response) {
     result = await deleteLikePost(likeInfo)
   }
 
+  await deleteUserCache('LikePosts', likeInfo.userId)
+  await deleteUserCache('Posts', likeInfo.authorId)
+
   res.json(result)
 }
 
 async function httpDeletePost (req: Request, res: Response) {
   const { postId } = req.params
-  const result = await deletePost(postId)
+  const post = await deletePost(postId)
 
-  res.json(result)
+  // * delete redis cache matches specific pattern
+  if (post) {
+    await deleteUserCache('Posts', post.authorId)
+  }
+
+  res.json(post)
 }
 
 export {

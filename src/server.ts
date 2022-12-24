@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 3000
 const apiServer = http.createServer(app)
 const io = new Server(apiServer, {
   cors: {
-    origin: 'http://localhost:8080'
+    origin: ['http://localhost:8080', 'http://192.168.1.106:8080']
   }
 })
 

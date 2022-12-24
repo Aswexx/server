@@ -29,8 +29,15 @@ import {
 import { Mutex } from '../../util/mutex'
 import jwt from 'jsonwebtoken'
 
-const getVertificationCode = (bytes = 4) =>
-  crypto.randomBytes(bytes).toString('hex')
+const getVertificationCode = (numOfChar: number = 4) => {
+  let code = ''
+  for (let i = 0; i < numOfChar; i++) {
+    const randomChar = crypto.randomInt(10)
+    code += randomChar
+  }
+
+  return code
+}
 
 async function httpGetUsers (req: Request, res: Response) {
   const result = await getUsers()
@@ -102,7 +109,18 @@ async function httpGetNormalLoginUser (req: Request, res: Response) {
   const { account, password } = req.body
   if (await checkLoginInfo(account, password)) {
     const user = await getUser(account)
-    generateTokensThenSetCookie(user, res)
+    await generateTokensThenSetCookie(user, res)
+    // res.cookie('reToken', refreshToken, {
+    //   httpOnly: true,
+    //   // secure: true,
+    //   maxAge: 7 * 24 * 60 * 60 * 1000
+    // })
+
+    // res.cookie('acToken', accessToken, {
+    //   httpOnly: true
+    //   // secure: true
+    // })
+
     res.json(user)
   } else {
     res.json('')

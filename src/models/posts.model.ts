@@ -38,7 +38,6 @@ const postSelector = {
 }
 
 async function getPosts (skip: number, take: number, order: string) {
-  console.log('😅😅', skip, take, order)
   const postCount = await prisma.post.count()
 
   const orderRule =
@@ -58,16 +57,38 @@ async function getPosts (skip: number, take: number, order: string) {
           type: true
         }
       },
+      mention: {
+        select: {
+          mentionedUserId: true,
+          mentionedUser: {
+            select: {
+              alias: true
+            }
+          }
+        }
+      },
       comments: {
         select: {
+          _count: true,
           id: true,
           contents: true,
           createdAt: true,
           onPost: {
             select: {
+              id: true,
               author: {
                 select: {
                   name: true,
+                  alias: true
+                }
+              }
+            }
+          },
+          mention: {
+            select: {
+              mentionedUserId: true,
+              mentionedUser: {
+                select: {
                   alias: true
                 }
               }
@@ -118,7 +139,8 @@ async function getUserLikePosts (userId: string) {
             comments: true
           }
         }
-      }
+      },
+      orderBy: { createdAt: 'desc' }
     })
 
     return posts

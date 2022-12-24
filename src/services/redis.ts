@@ -152,6 +152,18 @@ async function getCachePersistentChatRecord (key: string) {
   return null
 }
 
+async function deleteUserCache (keyPattern: string, userId: string) {
+  const regExp = new RegExp(keyPattern, 'i')
+
+  for await (const key of redisClient.scanIterator()) {
+    if (regExp.exec(key)) {
+      if (key.includes(`recent${keyPattern}:${userId}`) || key.includes(`home${keyPattern}`)) {
+        redisClient.del(key)
+      }
+    }
+  }
+}
+
 export {
   setOnlineUserState,
   updateOnlineUserState,
@@ -164,5 +176,6 @@ export {
   compareEmailVertificationCodeThenCreate,
   setCachePersistentChatRecord,
   getCachePersistentChatRecord,
+  deleteUserCache,
   redisClient
 }

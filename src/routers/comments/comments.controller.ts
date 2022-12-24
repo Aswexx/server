@@ -5,17 +5,23 @@ import {
   getComment,
   createComment,
   createLikeComment,
-  deleteLikeComment
+  deleteLikeComment,
+  deleteComment
 } from '../../models/comments.model'
 import { createNotif, NotifType } from '../../models/notif.model'
-import { interactEE } from '../../notificationSocket'
-import { redisClient } from '../../services/redis'
+import { interactEE, notificateTagedUsers } from '../../notificationSocket'
+import { deleteUserCache, redisClient } from '../../services/redis'
 import { addNewFileToS3, getFileFromS3 } from '../../services/s3'
 import { Mutex } from '../../util/mutex'
 
 async function httpCreatComment (req: Request, res: Response) {
   const newComment = req.body
-  console.log({ newComment })
+  let parsedTagedUsers = {}
+  if (newComment.tagedUsers) {
+    parsedTagedUsers = JSON.parse(newComment.tagedUsers)
+  }
+  const tagedUsers: string[] = Object.values(parsedTagedUsers)
+
   const file = {
     Body: req.file?.buffer,
     ContentType: req.file?.mimetype
@@ -26,31 +32,39 @@ async function httpCreatComment (req: Request, res: Response) {
     newComment.mediaType = file.ContentType
   }
 
-  const result = await createComment(newComment)
-  if (result && result.onPost && result.postId) {
-    const notif = await createNotif({
-      receiverId: result.onPost.authorId,
-      informerId: result.authorId,
-      targetPostId: result.postId,
-      notifType: NotifType.replyPost
-    })
-    // interactEE.emit(NotifType.replyPost, notif)
-    interactEE.emit('interact', notif)
-  } else if (result && result.onComment && result.onCommentId) {
-    const notif = await createNotif({
-      receiverId: result.onComment.authorId,
-      informerId: result.authorId,
-      targetCommentId: result.onCommentId,
-      notifType: NotifType.replyComment
-    })
-    // interactEE.emit(NotifType.replyComment, notif)
-    interactEE.emit('interact', notif)
+  const comment = await createComment(newComment)
+
+  if (comment) {
+    if (comment.onPost && comment.postId) {
+      const notif = await createNotif({
+        receiverId: comment.onPost.authorId,
+        informerId: comment.authorId,
+        targetPostId: comment.postId,
+        notifType: NotifType.replyPost
+      })
+      interactEE.emit('interact', notif)
+    } else if (comment.onComment && comment.onCommentId) {
+      const notif = await createNotif({
+        receiverId: comment.onComment.authorId,
+        informerId: comment.authorId,
+        targetCommentId: comment.onCommentId,
+        notifType: NotifType.replyComment
+      })
+      interactEE.emit('interact', notif)
+    }
+
+    if (comment.media) {
+      comment.media.url = await getFileFromS3(comment.media.url)
+    }
+
+    if (tagedUsers.length) {
+      await notificateTagedUsers(comment, tagedUsers)
+    }
+
+    await deleteUserCache('Comments', comment.authorId)
   }
 
-  if (result && result.media) {
-    result.media.url = await getFileFromS3(result.media.url)
-  }
-  res.json(result)
+  res.json(comment)
 }
 
 async function httpGetUserComments (req: Request, res: Response) {
@@ -134,10 +148,22 @@ async function httpUpdateLikeComment (req: Request, res: Response) {
   res.json(result)
 }
 
+async function httpDeleteComment (req: Request, res: Response) {
+  const { commentId } = req.params
+
+  const comment = await deleteComment(commentId)
+  if (comment) {
+    await deleteUserCache('Comments', comment.authorId)
+  }
+
+  res.json(comment)
+}
+
 export {
   httpGetAttatchComments,
   httpGetUserComments,
   httpGetComment,
   httpCreatComment,
-  httpUpdateLikeComment
+  httpUpdateLikeComment,
+  httpDeleteComment
 }

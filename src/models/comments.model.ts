@@ -116,7 +116,8 @@ async function getComments (userId: string) {
             author: true
           }
         }
-      }
+      },
+      orderBy: { createdAt: 'desc' }
     })
     return comments
   } catch (err) {
@@ -130,16 +131,25 @@ async function getComment (commentId: string) {
       where: { id: commentId },
       include: {
         author: {
-          select: { avatarUrl: true }
+          select: { avatarUrl: true, name: true }
         },
+        mention: {
+          select: {
+            mentionedUserId: true,
+            mentionedUser: {
+              select: {
+                alias: true
+              }
+            }
+          }
+        },
+        commentByComments: true,
         liked: true
       }
     })
 
-    await prisma.$disconnect()
     return comment
   } catch (err) {
-    await prisma.$disconnect()
     console.error(err)
   }
 }
@@ -149,6 +159,16 @@ async function getAttatchComments (commentId: string) {
     const result = await prisma.comment.findMany({
       where: { onCommentId: commentId },
       include: {
+        mention: {
+          select: {
+            mentionedUserId: true,
+            mentionedUser: {
+              select: {
+                alias: true
+              }
+            }
+          }
+        },
         author: {
           select: {
             name: true,
@@ -161,7 +181,8 @@ async function getAttatchComments (commentId: string) {
             user: { select: { name: true, id: true, alias: true } }
           }
         }
-      }
+      },
+      orderBy: { createdAt: 'desc' }
     })
     return result
   } catch (e) {
@@ -186,10 +207,8 @@ async function createLikeComment (likeCommentInfo: { [key: string]: string }) {
         }
       }
     })
-    await prisma.$disconnect()
     return result
   } catch (e) {
-    await prisma.$disconnect()
     console.error(e)
   }
 }
@@ -202,11 +221,21 @@ async function deleteLikeComment (likeCommentInfo: { [key: string]: string }) {
         commentId: likeCommentInfo.commentId
       }
     })
-    await prisma.$disconnect()
     return result
   } catch (e) {
-    await prisma.$disconnect()
     console.error(e)
+  }
+}
+
+async function deleteComment (commentId: string) {
+  try {
+    const comment = await prisma.comment.delete({
+      where: { id: commentId }
+    })
+
+    return comment
+  } catch (err) {
+    console.error(err)
   }
 }
 
@@ -216,5 +245,6 @@ export {
   getAttatchComments,
   createComment,
   createLikeComment,
-  deleteLikeComment
+  deleteLikeComment,
+  deleteComment
 }
