@@ -9,11 +9,20 @@ enum NotifType {
   likeComment = 'likeComment',
   replyComment = 'replyComment',
   inviteChat = 'inviteChat',
-  mention = 'mention'
+  mention = 'mention',
+  followNewPost = 'followNewPost'
+}
+
+async function tryCatch (fn: () => Promise<any>) {
+  try {
+    return await fn()
+  } catch (err) {
+    console.log(err)
+  }
 }
 
 async function getNotifs (userId: string) {
-  try {
+  return tryCatch(async () => {
     const result = await prisma.notification.findMany({
       where: { receiverId: userId },
       include: {
@@ -24,13 +33,11 @@ async function getNotifs (userId: string) {
       orderBy: { createdAt: 'desc' }
     })
     return result
-  } catch (err) {
-    console.error(err)
-  }
+  })
 }
 
-async function createNotif (notifData: {[key: string]: string, notifType: NotifType}) {
-  try {
+async function createNotif (notifData: { [key: string]: string, notifType: NotifType }) {
+  return tryCatch(async () => {
     const result = await prisma.notification.create({
       data: {
         receiverId: notifData.receiverId,
@@ -43,14 +50,11 @@ async function createNotif (notifData: {[key: string]: string, notifType: NotifT
         informer: { select: { name: true, avatarUrl: true } }
       }
     })
-
     return result
-  } catch (e) {
-    console.log(e)
-  }
+  })
 }
 
-interface MentionNotifData {
+interface NotifToSave {
   receiverId: string
   informerId: string
   targetPostId?: string
@@ -58,13 +62,34 @@ interface MentionNotifData {
   notifType: NotifType
 }
 
-async function createMentionNotifsThenGet (notifData: MentionNotifData[]) {
+async function createMultiNotifs (notifsToSave: NotifToSave[]) {
+  return tryCatch(async () => {
+    await prisma.notification.createMany({
+      data: notifsToSave
+    })
+
+    return await prisma.notification.findMany({
+      where: {
+        informerId: notifsToSave[0].informerId,
+        notifType: 'followNewPost',
+        targetPostId: notifsToSave[0].targetPostId
+      },
+      include: {
+        informer: {
+          select: { name: true, avatarUrl: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+  })
+}
+
+async function createMentionNotifsThenGet (notifData: NotifToSave[]) {
   //* due to createMany func just return num of rows, so query again by findMany func.
-  try {
+  return tryCatch(async () => {
     await prisma.notification.createMany({
       data: notifData
     })
-
     return await prisma.notification.findMany({
       where: {
         informerId: notifData[0].informerId,
@@ -78,14 +103,13 @@ async function createMentionNotifsThenGet (notifData: MentionNotifData[]) {
       },
       orderBy: { createdAt: 'desc' }
     })
-  } catch (e) {
-    console.log(e)
-  }
+  })
 }
 
 export {
   getNotifs,
   createNotif,
+  createMultiNotifs,
   createMentionNotifsThenGet,
   NotifType
 }

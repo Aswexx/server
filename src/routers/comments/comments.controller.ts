@@ -62,6 +62,7 @@ async function httpCreatComment (req: Request, res: Response) {
     }
 
     await deleteUserCache('Comments', comment.authorId)
+    await deleteUserCache('Posts', comment.authorId)
   }
 
   res.json(comment)
@@ -144,7 +145,7 @@ async function httpUpdateLikeComment (req: Request, res: Response) {
   } else {
     result = await deleteLikeComment(likeCommentInfo)
   }
-
+  await deleteUserCache('Posts', likeCommentInfo.userId)
   res.json(result)
 }
 

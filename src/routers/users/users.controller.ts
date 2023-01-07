@@ -6,12 +6,13 @@ import {
   getAdmin,
   createUser,
   updateUser,
-  addFollow,
-  deleteFollow,
+  // addFollow,
+  // deleteFollow,
   getGoogleUser,
   updateSponsor,
   checkLoginInfo
 } from '../../models/users.model'
+import { addFollow, deleteFollow } from '../../models/followShips.model'
 import { createNotif, NotifType } from '../../models/notif.model'
 import { sendMail } from '../../services/gmail'
 import { hashSync } from '../../util/bcrypt'
@@ -88,6 +89,7 @@ async function httpCreateUser (req: Request, res: Response) {
 async function httpAddFollow (req: Request, res: Response) {
   const updateInfo = req.body
   const followship = await addFollow(updateInfo)
+  console.log({ followship })
   const notif = await createNotif({
     receiverId: followship.followedId,
     informerId: followship.followerId,

@@ -13,11 +13,12 @@ import {
   deleteLikePost,
   deletePost
 } from '../../models/posts.model'
-import { createNotif, NotifType } from '../../models/notif.model'
+import { createMultiNotifs, createNotif, NotifType } from '../../models/notif.model'
 import { interactEE, notificateTagedUsers } from '../../notificationSocket'
 import { addNewFileToS3, getFileFromS3 } from '../../services/s3'
 import { deleteUserCache, redisClient } from '../../services/redis'
 import { Mutex } from '../../util/mutex'
+import { findFollowers } from '../../models/followShips.model'
 
 async function httpGetPosts (req: Request, res: Response) {
   const { skipPostsCount, take, order, keyword } = req.query
@@ -109,7 +110,14 @@ async function httpGetUserPosts (req: Request, res: Response) {
         post.author.avatarUrl = userAvatarUrl
       })
     }
+
+    await Promise.all(posts.map(async (post) => {
+      if (post.media) {
+        post.media.url = await getFileFromS3(post.media.url)
+      }
+    }))
   }
+
   await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(posts))
   mutex.releaseLock(cacheKey)
   res.json(posts)
@@ -132,11 +140,14 @@ async function httpGetUserLikePosts (req: Request, res: Response) {
     }
   }
 
-  const likes = await getUserLikePosts(userId)
+  const likePosts = await getUserLikePosts(userId)
 
-  if (likes) {
+  if (likePosts) {
     await Promise.all(
-      likes.map(async (like) => {
+      likePosts.map(async (like) => {
+        if (like.post.media) {
+          like.post.media.url = await getFileFromS3(like.post.media.url)
+        }
         const key = like.post.author.avatarUrl
         if (!/^https/.exec(key)) {
           like.post.author.avatarUrl = await getFileFromS3(key)
@@ -145,9 +156,9 @@ async function httpGetUserLikePosts (req: Request, res: Response) {
     )
   }
 
-  await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(likes))
+  await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(likePosts))
   mutex.releaseLock(cacheKey)
-  res.json(likes)
+  res.json(likePosts)
 }
 
 async function httpGetPost (req: Request, res: Response) {
@@ -200,6 +211,23 @@ async function httpCreatePost (req: Request, res: Response) {
       await notificateTagedUsers(post, tagedUsers)
     }
 
+    const followers: { followerId: string }[] = await findFollowers(post.author.id)
+
+    if (followers.length) {
+      const notifsToSave = followers.map(e => {
+        return {
+          receiverId: e.followerId,
+          informerId: post.author.id,
+          targetPostId: post.id,
+          notifType: NotifType.followNewPost
+        }
+      })
+      const notifs: object[] = await createMultiNotifs(notifsToSave)
+      notifs.forEach((notif) => {
+        interactEE.emit('interact', notif)
+        console.log('notif informed!')
+      })
+    }
     // * delete redis cache matches specific pattern
     await deleteUserCache('Posts', post.author.id)
   }

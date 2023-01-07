@@ -16,3 +16,6 @@ tsconfig.json
 .gitignore
 
 #testing
+
+#local cert
+*.pem

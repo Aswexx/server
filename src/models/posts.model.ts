@@ -129,14 +129,37 @@ async function getPosts (skip: number, take: number, order: string) {
 
 async function getUserLikePosts (userId: string) {
   try {
+    // const posts = await prisma.likePost.findMany({
+    //   where: { userId },
+    //   include: {
+    //     post: {
+    //       include: {
+    //         author: { select: { alias: true, avatarUrl: true } },
+    //         liked: true,
+    //         comments: true
+    //       }
+    //     }
+    //   },
+    //   orderBy: { createdAt: 'desc' }
+    // })
     const posts = await prisma.likePost.findMany({
       where: { userId },
       include: {
         post: {
           include: {
             author: { select: { alias: true, avatarUrl: true } },
+            media: {
+              select: {
+                type: true,
+                url: true
+              }
+            },
             liked: true,
-            comments: true
+            comments: {
+              include: {
+                author: { select: { alias: true, avatarUrl: true } }
+              }
+            }
           }
         }
       },
@@ -316,7 +339,17 @@ async function getPostsByMostLiked (skip: number, take: number) {
 async function getUserPosts (userId: string, skip: number = 0) {
   const result = prisma.post.findMany({
     where: { authorId: userId },
-    select: postSelector,
+    include: {
+      author: true,
+      media: {
+        select: {
+          type: true,
+          url: true
+        }
+      },
+      liked: true,
+      comments: true
+    },
     orderBy: { createdAt: 'desc' },
     skip,
     take: 10

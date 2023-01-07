@@ -115,9 +115,16 @@ async function getComments (userId: string) {
             liked: true,
             author: true
           }
+        },
+        onComment: {
+          include: {
+            liked: true,
+            author: true
+          }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      take: 10
     })
     return comments
   } catch (err) {
@@ -180,7 +187,8 @@ async function getAttatchComments (commentId: string) {
           select: {
             user: { select: { name: true, id: true, alias: true } }
           }
-        }
+        },
+        _count: true
       },
       orderBy: { createdAt: 'desc' }
     })

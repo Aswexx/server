@@ -20,7 +20,7 @@ require('dotenv').config()
 
 const whitelist = [
   'http://localhost:8080',
-  'http://192.168.1.106:8080'
+  'https://192.168.0.103:8080'
 ]
 
 app.use(cors({

@@ -134,41 +134,41 @@ async function updateUser (infoToUpdate: InfoToUpdate) {
   }
 }
 
-interface FollowRelation {
-  followerId: string
-  followedId: string
-}
+// interface FollowRelation {
+//   followerId: string
+//   followedId: string
+// }
 
-async function addFollow (updateInfo: FollowRelation) {
-  try {
-    const result = await prisma.followingShip.create({
-      data: {
-        followerId: updateInfo.followerId,
-        followedId: updateInfo.followedId
-      }
-    })
+// async function addFollow (updateInfo: FollowRelation) {
+//   try {
+//     const result = await prisma.followingShip.create({
+//       data: {
+//         followerId: updateInfo.followerId,
+//         followedId: updateInfo.followedId
+//       }
+//     })
 
-    return result
-  } catch (e) {
-    console.log(e)
-    process.exit(1)
-  }
-}
+//     return result
+//   } catch (e) {
+//     console.log(e)
+//     process.exit(1)
+//   }
+// }
 
-async function deleteFollow (followShipId: string) {
-  try {
-    const result = await prisma.followingShip.delete({
-      where: { id: followShipId }
-    })
+// async function deleteFollow (followShipId: string) {
+//   try {
+//     const result = await prisma.followingShip.delete({
+//       where: { id: followShipId }
+//     })
 
-    await prisma.$disconnect()
-    return result
-  } catch (e) {
-    console.log(e)
-    await prisma.$disconnect()
-    process.exit(1)
-  }
-}
+//     await prisma.$disconnect()
+//     return result
+//   } catch (e) {
+//     console.log(e)
+//     await prisma.$disconnect()
+//     process.exit(1)
+//   }
+// }
 
 async function checkLoginInfo (account: string, password: string) {
   const hash = await prisma.loginInfo.findUnique({
@@ -298,8 +298,8 @@ export {
   getGoogleUser,
   getAdmin,
   findUniqueUser,
-  addFollow,
-  deleteFollow,
+  // addFollow,
+  // deleteFollow,
   updateSponsor,
   getUsersWithId
 }
