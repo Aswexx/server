@@ -32,6 +32,7 @@ async function getNotifs (userId: string) {
       },
       orderBy: { createdAt: 'desc' }
     })
+    console.log('@@', result)
     return result
   })
 }

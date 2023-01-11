@@ -357,17 +357,22 @@ async function getUserPosts (userId: string, skip: number = 0) {
   return result
 }
 
-async function getAllPostsCreatedAt () {
+async function getAllPostsCreatedAt (date: { startDate: Date, endDate: Date }) {
+  const { startDate, endDate } = date
   try {
     const result = prisma.post.findMany({
-      select: { createdAt: true }
+      select: { createdAt: true },
+      where: {
+        createdAt: {
+          lte: endDate,
+          gte: startDate
+        }
+      }
     })
 
-    await prisma.$disconnect()
     return result
   } catch (err) {
     console.error(err)
-    await prisma.$disconnect()
   }
 }
 

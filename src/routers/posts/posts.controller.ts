@@ -181,7 +181,11 @@ async function httpGetPost (req: Request, res: Response) {
 }
 
 async function httpGetAllPostsCreatedAt (req: Request, res: Response) {
-  const result = await getAllPostsCreatedAt()
+  const { startDate, endDate } = req.body
+  const result = await getAllPostsCreatedAt({
+    startDate: new Date(startDate),
+    endDate: new Date(endDate)
+  })
 
   res.json(result)
 }

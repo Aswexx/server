@@ -3,9 +3,14 @@ import { createNotif, getNotifs } from '../../models/notif.model'
 import { interactEE } from '../../notificationSocket'
 import { getFileFromS3 } from '../../services/s3'
 
+interface Notif {
+  [keys: string]: string | { name: string; avatarUrl: string }
+  informer: { name: string; avatarUrl: string }
+}
+
 async function httpGetNotifs (req: Request, res: Response) {
   const { userId } = req.params
-  const notifs = await getNotifs(userId)
+  const notifs: Notif[] = await getNotifs(userId)
   if (!notifs) return res.json(null)
 
   const informerIds = notifs.map(e => e.informerId)
