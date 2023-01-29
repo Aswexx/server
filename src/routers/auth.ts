@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken'
 import { getUser } from '../models/users.model'
 import { authenticateToken } from '../util/tokens'
 // import { upsertUser } from '../models/users.model'
-require('dotenv').config()
+// require('dotenv').config()
 
 export
 const authRouter = express.Router()
@@ -38,6 +38,7 @@ declare global {
 }
 
 async function verifyCallback (req: Request, accessToken: string, refreshToken: string, profile: Profile, done: VerifyCallback) {
+  console.log('verifyCallback!~')
   if (!req.user) {
     console.log('id: ' + profile.id)
     console.log('name: ' + profile.displayName)

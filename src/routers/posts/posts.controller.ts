@@ -53,7 +53,7 @@ async function httpGetPosts (req: Request, res: Response) {
   }
 
   const mapResults = await Promise.all(
-    results.posts.map(async (post) => {
+    results.posts.map(async (post: any) => {
       if (post.media) {
         post.media.url = await getFileFromS3(post.media.url)
       }
@@ -106,12 +106,12 @@ async function httpGetUserPosts (req: Request, res: Response) {
   if (posts[0]) {
     if (!/^https/.exec(posts[0].author.avatarUrl)) {
       const userAvatarUrl = await getFileFromS3(posts[0].author.avatarUrl)
-      posts.forEach(post => {
+      posts.forEach((post: any) => {
         post.author.avatarUrl = userAvatarUrl
       })
     }
 
-    await Promise.all(posts.map(async (post) => {
+    await Promise.all(posts.map(async (post: any) => {
       if (post.media) {
         post.media.url = await getFileFromS3(post.media.url)
       }
@@ -144,7 +144,7 @@ async function httpGetUserLikePosts (req: Request, res: Response) {
 
   if (likePosts) {
     await Promise.all(
-      likePosts.map(async (like) => {
+      likePosts.map(async (like: any) => {
         if (like.post.media) {
           like.post.media.url = await getFileFromS3(like.post.media.url)
         }
@@ -169,7 +169,7 @@ async function httpGetPost (req: Request, res: Response) {
     result.author.avatarUrl = avatarUrl
 
     if (result.comments.length) {
-      await Promise.all(result.comments.map(async (comment) => {
+      await Promise.all(result.comments.map(async (comment: any) => {
         const avatarUrl = await getFileFromS3(comment.author.avatarUrl)
         comment.author.avatarUrl = avatarUrl
         return comment
@@ -213,6 +213,13 @@ async function httpCreatePost (req: Request, res: Response) {
 
     if (tagedUsers.length) {
       await notificateTagedUsers(post, tagedUsers)
+      for (const [alias, userId] of Object.entries(parsedTagedUsers)) {
+        const mentionedUserInfo = {
+          mentionedUser: { alias },
+          mentionedUserId: userId as string
+        }
+        post.mention.push(mentionedUserInfo)
+      }
     }
 
     const followers: { followerId: string }[] = await findFollowers(post.author.id)
@@ -229,13 +236,11 @@ async function httpCreatePost (req: Request, res: Response) {
       const notifs: object[] = await createMultiNotifs(notifsToSave)
       notifs.forEach((notif) => {
         interactEE.emit('interact', notif)
-        console.log('notif informed!')
       })
     }
     // * delete redis cache matches specific pattern
     await deleteUserCache('Posts', post.author.id)
   }
-
   res.json(post)
 }
 
@@ -245,15 +250,15 @@ async function httpUpdateLikePost (req: Request, res: Response) {
   if (likeInfo.isLike) {
     result = await createLikePost(likeInfo)
     if (!result) return
-
-    const notif = await createNotif({
-      receiverId: result.post.authorId,
-      informerId: result.userId,
-      targetPostId: result.postId,
-      notifType: NotifType.likePost
-    })
-
-    interactEE.emit('interact', notif)
+    if (likeInfo.authorId !== likeInfo.userId) {
+      const notif = await createNotif({
+        receiverId: result.post.authorId,
+        informerId: result.userId,
+        targetPostId: result.postId,
+        notifType: NotifType.likePost
+      })
+      interactEE.emit('interact', notif)
+    }
   } else {
     result = await deleteLikePost(likeInfo)
   }

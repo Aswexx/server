@@ -29,13 +29,15 @@ function setCookieWithTokens (refreshToken: string, accessToken: string, res: Re
   console.log('setting cookies.........🔑🔑🔑🔑')
   res.cookie('reToken', refreshToken, {
     httpOnly: true,
-    // secure: true,
+    secure: true,
+    sameSite: 'none',
     maxAge: REFRESH_TOKEN_COOKIE_EXP
   })
 
   res.cookie('acToken', accessToken, {
-    httpOnly: true
-    // secure: true
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none'
   })
 }
 

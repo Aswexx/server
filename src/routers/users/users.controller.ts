@@ -145,6 +145,7 @@ async function httpGetUser (req: Request, res: Response) {
   }
 
   const result = await getUser(userId)
+  console.log('@@@user', result)
   await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(result))
   mutex.releaseLock(cacheKey)
   return res.json(result)
@@ -260,6 +261,7 @@ async function httpUpdateUser (req: Request, res: Response) {
 async function httpGetGoolgeUser (req: Request, res: Response) {
   const { token } = req.body
   const user = await getGoogleUser(token)
+  console.log('user~~', user)
   generateTokensThenSetCookie(user, res)
   res.json(user)
 }

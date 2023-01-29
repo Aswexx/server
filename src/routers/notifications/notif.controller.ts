@@ -31,8 +31,6 @@ async function httpGetNotifs (req: Request, res: Response) {
     idWithAvatarMap.set(e.id, e.avatarUrl)
   })
 
-  console.log({ idWithAvatarMap })
-
   const mappedNotifs = notifs!.map(e => {
     return {
       ...e,
@@ -52,7 +50,6 @@ async function httpCreatNotif (req: Request, res: Response) {
   if (result) {
     result.informer.avatarUrl = await getFileFromS3(result.informer.avatarUrl)
     interactEE.emit('interact', result)
-    console.log({ result })
   }
   res.json(result)
 }

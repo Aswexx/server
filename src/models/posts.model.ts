@@ -220,7 +220,8 @@ async function getPostsByKeyword (keyword: string) {
             avatarUrl: true
           }
         }
-      }
+      },
+      orderBy: { createdAt: 'desc' }
     })
     await prisma.$disconnect()
     return { posts, postCount: posts.length }
@@ -460,6 +461,16 @@ async function createPost (newPost: Post) {
         },
         media: {
           select: { url: true, type: true }
+        },
+        mention: {
+          select: {
+            mentionedUserId: true,
+            mentionedUser: {
+              select: {
+                alias: true
+              }
+            }
+          }
         }
       }
     })

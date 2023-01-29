@@ -1,7 +1,7 @@
 import { Server } from 'socket.io'
 import { EventEmitter } from 'events'
 import { setOnlineUserState, getOnlineUserState, updateOnlineUserState } from './services/redis'
-import { createMentionNotifsThenGet, NotifType } from './models/notif.model'
+import { createMentionNotifsThenGet, NotifType, updateNotifsReadState } from './models/notif.model'
 import { createMentionsThenGet } from './models/mention.model'
 import { getFileFromS3 } from './services/s3'
 
@@ -39,6 +39,11 @@ function notificationSocket (io: Server) {
       }
 
       sponsorPaidEE.on('paid', publishUpdateSponsorState)
+    })
+
+    socket.on('updateNotifsReadState', (notifs) => {
+      console.log('readNotifs', notifs)
+      updateNotifsReadState(notifs)
     })
 
     socket.on('disconnect', async (reason) => {
@@ -88,10 +93,13 @@ async function notificateTagedUsers (tagedContent: { [keys: string]: any }, tage
     })
   }
 
+  interface Notif {
+    [keys: string]: string | { name: string; avatarUrl: string }
+    informer: { name: string; avatarUrl: string }
+  }
   const mentions = await createMentionsThenGet(mentionedUsers)
-  const notifsAfterCreate = await createMentionNotifsThenGet(notifs)
-
-  console.log(notifs, mentions)
+  const notifsAfterCreate: Notif[] = await createMentionNotifsThenGet(notifs)
+  console.log(mentions, notifsAfterCreate)
 
   if (notifsAfterCreate) {
     const infromerAvatarUrl = await getFileFromS3(

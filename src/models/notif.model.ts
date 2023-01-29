@@ -107,10 +107,20 @@ async function createMentionNotifsThenGet (notifData: NotifToSave[]) {
   })
 }
 
+async function updateNotifsReadState (notifs: string[]) {
+  return tryCatch(async () => {
+    await prisma.notification.updateMany({
+      where: { id: { in: notifs } },
+      data: { isRead: true }
+    })
+  })
+}
+
 export {
   getNotifs,
   createNotif,
   createMultiNotifs,
   createMentionNotifsThenGet,
+  updateNotifsReadState,
   NotifType
 }

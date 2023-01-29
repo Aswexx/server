@@ -38,8 +38,7 @@ async function getUsers () {
     })
 
     // * 以是否直接放http url 區分假帳號與真實創建，後者需要再把 s3 key 轉成暫時性 url
-
-    await Promise.all(result.map(async (user) => {
+    await Promise.all(result.map(async (user: any) => {
       if (!/^https/.exec(user.avatarUrl)) {
         const urls = await Promise.all([
           await getFileFromS3(user.bgImageUrl),
@@ -185,10 +184,10 @@ async function getUser (userIdOrEmail: string) {
       where: { OR: [{ id: userIdOrEmail }, { email: userIdOrEmail }] },
       include: {
         follow: {
-          select: { follower: true }
+          select: { followedId: true }
         },
         followed: {
-          select: { followedId: true }
+          select: { followerId: true }
         }
       }
     })

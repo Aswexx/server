@@ -1,0 +1,13 @@
+version: '3.9'
+services:
+  test-redis:
+    image: 'redis:alpine'
+  test-webapp:
+    restart: on-failure
+    # env_file: .env
+    image: aswexx/bktest
+    # build:
+    #   context: .
+    #   target: dev
+    ports:
+      - '90:4000'

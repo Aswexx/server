@@ -1,13 +1,36 @@
 import { createClient } from 'redis'
 import { ChatRecord, PrismaClient } from '@prisma/client'
+// import { PrismaClient } from '@prisma/client'
 import { getUsersWithId } from '../models/users.model'
+
+// type ChatRecord = {
+//   id: string
+//   senderId: string
+//   contents: string
+//   chatTargetId: string
+//   createdAt: Date
+// }
+
 const prisma = new PrismaClient()
 
 const EXP_TIME = 10 * 60
 const EMAIL_VERTIFY_EXP = 15 * 60
 
-const subscriber = createClient()
-const redisClient = createClient();
+const subscriber = createClient({
+  url: process.env.REDIS_URL
+})
+const redisClient = createClient({
+  url: process.env.REDIS_URL
+});
+// const subscriber = createClient({
+//   url: 'redis://ec2-user-test-redis-1:6379'
+// })
+// const redisClient = createClient({
+//   url: 'redis://ec2-user-test-redis-1:6379'
+// });
+// const subscriber = createClient()
+// const redisClient = createClient();
+
 (async function connectToRedis () {
   try {
     await redisClient.connect()
@@ -43,9 +66,11 @@ const redisClient = createClient();
 async function initUsersOnlineState () {
   // TODO: not to do db query if onlinestate exist
   const users = await getUsersWithId()
-  users?.forEach(e => {
+  users?.forEach((e: {id: string }) => {
     redisClient.hSet('onlineState', e.id, 0)
   })
+
+  console.log('@@initUserWithIds:@@', users)
 }
 
 async function setOnlineUserState (userId: string, socketId: string) {

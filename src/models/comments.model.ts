@@ -58,7 +58,15 @@ class CommentData {
   setJoin () {
     if (this.comment.commentId) {
       this.join.onComment = {
-        select: { authorId: true }
+        select: {
+          authorId: true,
+          author: {
+            select: {
+              name: true,
+              alias: true
+            }
+          }
+        }
       }
     } else {
       this.join.onPost = {

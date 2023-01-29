@@ -14,6 +14,28 @@ import { deleteUserCache, redisClient } from '../../services/redis'
 import { addNewFileToS3, getFileFromS3 } from '../../services/s3'
 import { Mutex } from '../../util/mutex'
 
+async function notificate (createdComment: any) {
+  if (createdComment.onPost && createdComment.postId) {
+    if (createdComment.authorId === createdComment.onPost.authorId) return
+    const notif = await createNotif({
+      receiverId: createdComment.onPost.authorId,
+      informerId: createdComment.authorId,
+      targetPostId: createdComment.postId,
+      notifType: NotifType.replyPost
+    })
+    interactEE.emit('interact', notif)
+  } else if (createdComment.onComment && createdComment.onCommentId) {
+    if (createdComment.authorId === createdComment.onComment.authorId) return
+    const notif = await createNotif({
+      receiverId: createdComment.onComment.authorId,
+      informerId: createdComment.authorId,
+      targetCommentId: createdComment.onCommentId,
+      notifType: NotifType.replyComment
+    })
+    interactEE.emit('interact', notif)
+  }
+}
+
 async function httpCreatComment (req: Request, res: Response) {
   const newComment = req.body
   let parsedTagedUsers = {}
@@ -33,26 +55,8 @@ async function httpCreatComment (req: Request, res: Response) {
   }
 
   const comment = await createComment(newComment)
-
   if (comment) {
-    if (comment.onPost && comment.postId) {
-      const notif = await createNotif({
-        receiverId: comment.onPost.authorId,
-        informerId: comment.authorId,
-        targetPostId: comment.postId,
-        notifType: NotifType.replyPost
-      })
-      interactEE.emit('interact', notif)
-    } else if (comment.onComment && comment.onCommentId) {
-      const notif = await createNotif({
-        receiverId: comment.onComment.authorId,
-        informerId: comment.authorId,
-        targetCommentId: comment.onCommentId,
-        notifType: NotifType.replyComment
-      })
-      interactEE.emit('interact', notif)
-    }
-
+    notificate(comment)
     if (comment.media) {
       comment.media.url = await getFileFromS3(comment.media.url)
     }
@@ -88,7 +92,7 @@ async function httpGetUserComments (req: Request, res: Response) {
   const comments = await getComments(userId)
   if (comments && comments.length) {
     const avatarUrl = await getFileFromS3(comments[0].author.avatarUrl)
-    comments.forEach((comment) => {
+    comments.forEach((comment: any) => {
       comment.author.avatarUrl = avatarUrl
     })
   }
@@ -114,6 +118,7 @@ async function httpGetAttatchComments (req: Request, res: Response) {
 
   if (comments) {
     await Promise.all(
+      // @ts-ignore
       comments.map(async (comment) => {
         const fileKey = comment.author.avatarUrl
         if (!/^https/.exec(fileKey)) {
@@ -133,7 +138,7 @@ async function httpUpdateLikeComment (req: Request, res: Response) {
   let result
   if (likeCommentInfo.isLike) {
     result = await createLikeComment(likeCommentInfo)
-    if (result) {
+    if (result && (result.userId !== result.comment.authorId)) {
       const notif = await createNotif({
         receiverId: result.comment.author.id,
         informerId: result.userId,
