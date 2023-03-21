@@ -22,6 +22,7 @@ import { findFollowers } from '../../models/followShips.model'
 
 async function httpGetPosts (req: Request, res: Response) {
   const { skipPostsCount, take, order, keyword } = req.query
+  const iosAccessToken = req.headers.authorization?.split(' ')[1]
   let results
 
   const cacheKey = `homePosts:${skipPostsCount}${take}${order}${keyword}`
@@ -81,7 +82,7 @@ async function httpGetPosts (req: Request, res: Response) {
     JSON.stringify({ ...mapResults, postCount: results.postCount })
   )
   mutex.releaseLock(cacheKey)
-  res.json({ ...mapResults, postCount: results.postCount })
+  res.json({ ...mapResults, postCount: results.postCount, iosAccessToken })
 }
 
 async function httpGetUserPosts (req: Request, res: Response) {
@@ -111,11 +112,24 @@ async function httpGetUserPosts (req: Request, res: Response) {
       })
     }
 
-    await Promise.all(posts.map(async (post: any) => {
-      if (post.media) {
-        post.media.url = await getFileFromS3(post.media.url)
-      }
-    }))
+    await Promise.all(
+      posts.map(async (post: any) => {
+        if (post.media) {
+          post.media.url = await getFileFromS3(post.media.url)
+        }
+
+        if (post.comments.length) {
+          for (const comment of post.comments) {
+            if (comment.media && comment.media.url) {
+              comment.media.url = await getFileFromS3(comment.media.url)
+            }
+            comment.author.avatarUrl = await getFileFromS3(
+              comment.author.avatarUrl
+            )
+          }
+        }
+      })
+    )
   }
 
   await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(posts))
@@ -238,7 +252,7 @@ async function httpCreatePost (req: Request, res: Response) {
         interactEE.emit('interact', notif)
       })
     }
-    // * delete redis cache matches specific pattern
+    // * delete redis cache which matches specific pattern
     await deleteUserCache('Posts', post.author.id)
   }
   res.json(post)

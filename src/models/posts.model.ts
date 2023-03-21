@@ -129,19 +129,6 @@ async function getPosts (skip: number, take: number, order: string) {
 
 async function getUserLikePosts (userId: string) {
   try {
-    // const posts = await prisma.likePost.findMany({
-    //   where: { userId },
-    //   include: {
-    //     post: {
-    //       include: {
-    //         author: { select: { alias: true, avatarUrl: true } },
-    //         liked: true,
-    //         comments: true
-    //       }
-    //     }
-    //   },
-    //   orderBy: { createdAt: 'desc' }
-    // })
     const posts = await prisma.likePost.findMany({
       where: { userId },
       include: {
@@ -333,24 +320,96 @@ async function getPostsByMostLiked (skip: number, take: number) {
     take,
     orderBy: { liked: { _count: 'desc' } }
   })
-
   return { posts, postCount }
 }
 
 async function getUserPosts (userId: string, skip: number = 0) {
   const result = prisma.post.findMany({
     where: { authorId: userId },
-    include: {
-      author: true,
+    select: {
+      id: true,
+      contents: true,
+      createdAt: true,
+      liked: true,
       media: {
         select: {
-          type: true,
-          url: true
+          url: true,
+          type: true
         }
       },
-      liked: true,
-      comments: true
+      mention: {
+        select: {
+          mentionedUserId: true,
+          mentionedUser: {
+            select: {
+              alias: true
+            }
+          }
+        }
+      },
+      comments: {
+        select: {
+          _count: true,
+          id: true,
+          contents: true,
+          createdAt: true,
+          onPost: {
+            select: {
+              id: true,
+              author: {
+                select: {
+                  name: true,
+                  alias: true
+                }
+              }
+            }
+          },
+          mention: {
+            select: {
+              mentionedUserId: true,
+              mentionedUser: {
+                select: {
+                  alias: true
+                }
+              }
+            }
+          },
+          media: {
+            select: { url: true, type: true }
+          },
+          author: {
+            select: {
+              name: true,
+              alias: true,
+              avatarUrl: true
+            }
+          },
+          liked: {
+            select: { userId: true }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      },
+      author: {
+        select: {
+          id: true,
+          name: true,
+          alias: true,
+          avatarUrl: true
+        }
+      }
     },
+    // include: {
+    //   author: true,
+    //   media: {
+    //     select: {
+    //       type: true,
+    //       url: true
+    //     }
+    //   },
+    //   liked: true,
+    //   comments: true
+    // },
     orderBy: { createdAt: 'desc' },
     skip,
     take: 10

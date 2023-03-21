@@ -38,7 +38,7 @@ async function getUsers () {
     })
 
     // * 以是否直接放http url 區分假帳號與真實創建，後者需要再把 s3 key 轉成暫時性 url
-    await Promise.all(result.map(async (user: any) => {
+    const mappedResult = await Promise.all(result.map(async (user: any) => {
       if (!/^https/.exec(user.avatarUrl)) {
         const urls = await Promise.all([
           await getFileFromS3(user.bgImageUrl),
@@ -52,8 +52,7 @@ async function getUsers () {
     }))
 
     // *****
-
-    return result
+    return mappedResult
   } catch (err) {
     console.error(err)
   }
@@ -82,7 +81,6 @@ async function createUser (data: registerData) {
       })
     }
 
-    // TODO: fix default images
     const result = await prisma.user.create({
       data: {
         name,
@@ -111,24 +109,26 @@ interface InfoToUpdate {
 
 async function updateUser (infoToUpdate: InfoToUpdate) {
   try {
-    console.log('🗺️🗺️🗺️', infoToUpdate)
-    let result
     if (infoToUpdate.fileKeys) {
-      result = await prisma.user.update({
+      return await prisma.user.update({
         where: { id: infoToUpdate.userId },
         data: {
           alias: infoToUpdate.alias,
           bio: infoToUpdate.bio,
           bgImageUrl: infoToUpdate.fileKeys.backgroundImageKey,
           avatarUrl: infoToUpdate.fileKeys.avatarKey
+        },
+        include: {
+          follow: {
+            select: { followedId: true }
+          },
+          followed: {
+            select: { followerId: true }
+          }
         }
       })
     }
-
-    await prisma.$disconnect()
-    return result
   } catch (err) {
-    await prisma.$disconnect()
     console.error(err)
   }
 }
@@ -184,15 +184,22 @@ async function getUser (userIdOrEmail: string) {
       where: { OR: [{ id: userIdOrEmail }, { email: userIdOrEmail }] },
       include: {
         follow: {
-          select: { followedId: true }
+          select: { followedId: true, id: true }
         },
         followed: {
-          select: { followerId: true }
+          select: { followerId: true, id: true }
         }
       }
     })
 
-    if (user && !/^https/.exec(user.avatarUrl)) {
+    if (!user) throw new Error('user not found')
+
+    if (/@gmail\.com/.exec(user.email)) {
+      if ((!/^https/.exec(user.avatarUrl))) {
+        user.avatarUrl = await getFileFromS3(user.avatarUrl)
+      }
+      user.bgImageUrl = await getFileFromS3(user.bgImageUrl)
+    } else if (!/^https/.exec(user.avatarUrl)) {
       const urls = await Promise.all([
         await getFileFromS3(user.bgImageUrl),
         await getFileFromS3(user.avatarUrl)
@@ -242,6 +249,13 @@ async function getGoogleUser (token: string) {
       const newUser = await createUser({ email, name, picture, alias: `${name}_${getRandomString(4)}` })
       return newUser
     }
+
+    if (!/^https/.exec(user.avatarUrl)) {
+      user.avatarUrl = await getFileFromS3(user.avatarUrl)
+    }
+    user.bgImageUrl = await getFileFromS3(user.bgImageUrl)
+
+    console.log('🐶🐶🐶', user)
     return user
   } catch (err) {
     console.log(err)

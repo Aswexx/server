@@ -24,7 +24,6 @@ export async function setEnvVar () {
       for (const [key, value] of Object.entries(parsedSecret)) {
         process.env[key] = value as string
       }
-      console.log('@@@!!', process.env.test1)
     }
   } catch (e) {
     console.log(e)

@@ -38,8 +38,6 @@ const redisClient = createClient({
     await initUsersOnlineState()
     redisClient.configSet('notify-keyspace-events', 'Ex')
     subscriber.subscribe('__keyevent@0__:expired', async (msgKey) => {
-      console.log('@@@⚙️', msgKey)
-
       const record = await redisClient.lRange(`temp_${msgKey}`, 0, -1)
       const parsedRecord = record.map(r => JSON.parse(r))
       const recordToSave = parsedRecord.filter(r => r.persist)
@@ -51,11 +49,9 @@ const redisClient = createClient({
           createdAt: new Date(r.createdTime)
         }
       })
-      console.log('mappedToSave', mappedRecordToSave)
       await prisma.chatRecord.createMany({
         data: mappedRecordToSave
       })
-      console.log('recordToDaveToDb', record)
       await redisClient.del(`temp_${msgKey}`)
     })
   } catch (err) {

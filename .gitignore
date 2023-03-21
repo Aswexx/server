@@ -5,15 +5,14 @@
 .DS_Store
 /.vscode
 .env
+logs
 
 #production
 /build
-/public
 
 #config
 .eslint*
 tsconfig.json
-.gitignore
 
 #testing
 

@@ -31,7 +31,9 @@ function createApiServer (app: Express) {
     cors: {
       origin: [
         'http://localhost:8080',
+        'https://192.168.0.101:8080',
         'https://192.168.0.103:8080',
+        'https://192.168.0.105:8080',
         'https://joeln.site'
       ]
     }
@@ -41,8 +43,9 @@ function createApiServer (app: Express) {
   notificationSocket(io)
 
   apiServer.listen(PORT, () => {
-    console.log(`
-          http://localhost:${PORT}/test2
-        `)
+    console.log(
+      `http://localhost:${PORT}/test2`,
+      '02191718'
+    )
   })
 })()

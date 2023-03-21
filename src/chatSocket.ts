@@ -41,7 +41,6 @@ function chatSocket (io: Server) {
     socket.on('startChat', async (roomInfo) => {
       const { triggerUser, targetUser, isTriggerUserSponsor } = roomInfo
       let persistentChatRecord
-      console.log(triggerUser, targetUser, isTriggerUserSponsor)
       // * if triggerUser is sponsor then try to get persistent chat record first
       if (isTriggerUserSponsor) {
         persistentChatRecord = await getPersistentChatRecord(triggerUser, targetUser)

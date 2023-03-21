@@ -2,23 +2,51 @@ import { NextFunction, Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import { redisClient } from '../services/redis'
 
-// const refreshTokenCollection: string[] = [] // save to Redis
 const accessTokenExp: { expiresIn: number | string | undefined } =
-  { expiresIn: 30 * 60 }
-
-// const refreshTokenExp: { expiresIn: number | string | undefined } = {
-//   expiresIn: 60 * 60
-// }
+  { expiresIn: 15 * 60 }
 
 const REFRESH_TOKEN_COOKIE_EXP = 7 * 24 * 60 * 60 * 1000
+const ACCESS_TOKEN_COOKIE_EXP = 15 * 60 * 1000
+
+interface DeviceInfo {
+  isIOSdevice: boolean
+  reqIp: string | string[] | undefined
+}
+
+async function generateTokens (userInfo: any, deviceInfo?: DeviceInfo) {
+  if (!process.env.REFRESH_TOKEN_SECRET || !process.env.ACCESS_TOKEN_SECRET) {
+    throw new Error('env variable not defined')
+  }
+
+  const payload: { id: string; isIOSdevice?: boolean } = {
+    id: userInfo.id
+  }
+  const refreshToken = jwt.sign(payload, process.env.REFRESH_TOKEN_SECRET)
+  let accessToken = jwt.sign(
+    payload,
+    process.env.ACCESS_TOKEN_SECRET,
+    accessTokenExp
+  )
+
+  if (deviceInfo) {
+    payload.isIOSdevice = true
+    accessToken = jwt.sign(
+      payload,
+      process.env.ACCESS_TOKEN_SECRET,
+      accessTokenExp
+    )
+
+    console.log('regenTTTTTT', JSON.stringify(deviceInfo.reqIp), userInfo.id)
+
+    await redisClient.hSet('iosUsersIp', JSON.stringify(deviceInfo.reqIp), userInfo.id)
+  }
+
+  await redisClient.hSet('refreshTokenCollection', userInfo.id, refreshToken)
+  return { refreshToken, accessToken }
+}
 
 async function generateTokensThenSetCookie (userInfo: any, res: Response) {
-  if (!process.env.REFRESH_TOKEN_SECRET ||
-    !process.env.ACCESS_TOKEN_SECRET) throw new Error('env variable not defined')
-
-  const payload = { id: userInfo.id }
-  const refreshToken = jwt.sign(payload, process.env.REFRESH_TOKEN_SECRET)
-  const accessToken = jwt.sign(payload, process.env.ACCESS_TOKEN_SECRET, accessTokenExp)
+  const { refreshToken, accessToken } = await generateTokens(userInfo)
 
   setCookieWithTokens(refreshToken, accessToken, res)
   await redisClient.hSet('refreshTokenCollection', userInfo.id, refreshToken)
@@ -37,40 +65,78 @@ function setCookieWithTokens (refreshToken: string, accessToken: string, res: Re
   res.cookie('acToken', accessToken, {
     httpOnly: true,
     secure: true,
-    sameSite: 'none'
+    sameSite: 'none',
+    maxAge: ACCESS_TOKEN_COOKIE_EXP
   })
 }
 
 async function authenticateToken (req: Request, res: Response, next: NextFunction) {
-  const acToken = req.cookies.acToken
+  const acToken = req.cookies.acToken || req.headers.authorization?.split(' ')[1]
   const refreshToken = req.cookies.reToken
+  const reqIp = req.headers['x-forwarded-for'] || req.ip
+
+  console.log(
+    '@@@@acToken',
+    'cookie-acToken',
+    req.cookies.acToken,
+    'header-token',
+    req.headers.authorization?.split(' ')[1]
+  )
+
   const decoded = jwt.decode(acToken, { complete: true })
   let userId
+  let isIOSdevice
   if (decoded) {
     // @ts-ignore
     userId = decoded.payload.id
+    // @ts-ignore
+    isIOSdevice = decoded.payload.isIOSdevice
   }
 
   try {
-    console.log('acToken & reToken:', acToken, refreshToken)
     jwt.verify(acToken, process.env.ACCESS_TOKEN_SECRET as string)
     next()
   } catch (err) {
-    console.log('❌❌', err, 'accessToken not valid or expired')
-    const refreshTokenCollection = await redisClient.hGetAll('refreshTokenCollection')
-    console.log('🔑🔑checking refreshTokenCollection', refreshTokenCollection)
+    const loginedUserId = await redisClient.hGet(
+      'iosUsersIp',
+      JSON.stringify(reqIp)
+    )
+    console.log('acToken not valid', isIOSdevice, loginedUserId)
 
-    if (!refreshToken || !userId) return res.sendStatus(401)
-    if (!(await redisClient.hGet('refreshTokenCollection', userId))) {
-      console.log('🗺️', 'RefreshToken Not Existed')
+    // * In order to ensure automatic refreshing of the accessToken for iOS users
+    // * when revisiting the website, the alternative process will only be executed
+    // * when it cannot be confirmed that the current request is coming from an iOS
+    // * device and the login IP for iOS has not been previously recorded in Redis."
+
+    if (!isIOSdevice && !loginedUserId) {
+      console.log('❌❌', err, 'accessToken not valid or expired')
+
+      if (!refreshToken || !userId) return res.sendStatus(401)
+      if (!(await redisClient.hGet('refreshTokenCollection', userId))) {
+        console.log('🗺️', 'RefreshToken Not Existed')
+        return res.sendStatus(401)
+      }
+      const newAccessToken = tokenRefresh(refreshToken, res)
+      console.log('⭕⭕⭕ newAccessToken generated', newAccessToken)
+      res.cookie('acToken', newAccessToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'none'
+      })
+      return next()
+    }
+    // * IOS device
+    console.log('🔑🔑checking IOS ip....')
+    if (!loginedUserId) {
       return res.sendStatus(401)
     }
-    const newAccessToken = tokenRefresh(refreshToken, res)
-    console.log('⭕⭕⭕ newAccessToken generated', newAccessToken)
-    res.cookie('acToken', newAccessToken, {
-      httpOnly: true,
-      secure: true
-    })
+
+    const { accessToken } = await generateTokens(
+      { id: loginedUserId },
+      { isIOSdevice: true, reqIp }
+    )
+    req.headers.authorization = `Bearer ${accessToken}`
+    console.log('new req acToken', accessToken)
     next()
   }
 }
@@ -91,8 +157,7 @@ function tokenRefresh (refreshToken: string, res: Response) {
 }
 
 export {
+  generateTokens,
   generateTokensThenSetCookie,
   authenticateToken
-  // refreshTokenCollection
-  // isAuthenticated
 }

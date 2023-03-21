@@ -4,10 +4,7 @@ services:
     image: 'redis:alpine'
   test-webapp:
     restart: on-failure
-    # env_file: .env
     image: aswexx/bktest
-    # build:
-    #   context: .
-    #   target: dev
+    command: chmod 777 node_modules
     ports:
       - '90:4000'

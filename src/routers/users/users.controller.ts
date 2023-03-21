@@ -17,6 +17,7 @@ import { createNotif, NotifType } from '../../models/notif.model'
 import { sendMail } from '../../services/gmail'
 import { hashSync } from '../../util/bcrypt'
 import {
+  generateTokens,
   generateTokensThenSetCookie
 } from '../../util/tokens'
 import { interactEE, sponsorPaidEE } from './../../notificationSocket'
@@ -29,6 +30,7 @@ import {
 } from '../../services/redis'
 import { Mutex } from '../../util/mutex'
 import jwt from 'jsonwebtoken'
+import { logger } from '../../util/logger'
 
 const getVertificationCode = (numOfChar: number = 4) => {
   let code = ''
@@ -42,6 +44,10 @@ const getVertificationCode = (numOfChar: number = 4) => {
 
 async function httpGetUsers (req: Request, res: Response) {
   const result = await getUsers()
+  logger.info('login authenticated', {
+    timestamp: new Date(),
+    reqIp: req.headers['x-forwarded-for'] || req.ip
+  })
   res.json(result)
 }
 
@@ -63,7 +69,6 @@ async function httpEmailVertification (req: Request, res: Response) {
     return res.status(400).json('驗證碼錯誤或失效，請重新嘗試註冊')
   }
 
-  console.log(userDataToCreate)
   userDataToCreate.password = hashSync(userDataToCreate.password)
   await createUser(userDataToCreate)
   res.json({ success: 'ok' })
@@ -89,7 +94,6 @@ async function httpCreateUser (req: Request, res: Response) {
 async function httpAddFollow (req: Request, res: Response) {
   const updateInfo = req.body
   const followship = await addFollow(updateInfo)
-  console.log({ followship })
   const notif = await createNotif({
     receiverId: followship.followedId,
     informerId: followship.followerId,
@@ -108,22 +112,20 @@ async function httpDeleteFollow (req: Request, res: Response) {
 }
 
 async function httpGetNormalLoginUser (req: Request, res: Response) {
-  const { account, password } = req.body
+  const { account, password, isIOSdevice } = req.body
   if (await checkLoginInfo(account, password)) {
     const user = await getUser(account)
-    await generateTokensThenSetCookie(user, res)
-    // res.cookie('reToken', refreshToken, {
-    //   httpOnly: true,
-    //   // secure: true,
-    //   maxAge: 7 * 24 * 60 * 60 * 1000
-    // })
 
-    // res.cookie('acToken', accessToken, {
-    //   httpOnly: true
-    //   // secure: true
-    // })
-
-    res.json(user)
+    if (isIOSdevice) {
+      const { accessToken } = await generateTokens(user, {
+        isIOSdevice: isIOSdevice as boolean,
+        reqIp: req.headers['x-forwarded-for'] || req.ip
+      })
+      res.json({ user, accessToken })
+    } else {
+      await generateTokensThenSetCookie(user, res)
+      res.json(user)
+    }
   } else {
     res.json('')
   }
@@ -145,7 +147,6 @@ async function httpGetUser (req: Request, res: Response) {
   }
 
   const result = await getUser(userId)
-  console.log('@@@user', result)
   await redisClient.setEx(cacheKey, 30 * 60, JSON.stringify(result))
   mutex.releaseLock(cacheKey)
   return res.json(result)
@@ -255,25 +256,33 @@ async function httpUpdateUser (req: Request, res: Response) {
     result.avatarUrl = await getFileFromS3(result.avatarUrl)
     result.bgImageUrl = await getFileFromS3(result.bgImageUrl)
   }
+
   res.json(result)
 }
 
 async function httpGetGoolgeUser (req: Request, res: Response) {
-  const { token } = req.body
+  const { token, isIOSdevice } = req.body
   const user = await getGoogleUser(token)
-  console.log('user~~', user)
-  generateTokensThenSetCookie(user, res)
-  res.json(user)
+
+  if (isIOSdevice) {
+    const { accessToken } = await generateTokens(user, {
+      isIOSdevice: isIOSdevice as boolean,
+      reqIp: req.headers['x-forwarded-for'] || req.ip
+    })
+    res.json({ user, accessToken })
+  } else {
+    await generateTokensThenSetCookie(user, res)
+    res.json(user)
+  }
 }
 
 async function httpGetAdmin (req: Request, res: Response) {
   const { account, password } = req.body
-  console.log({ account, password })
   const result = await getAdmin(account, password)
   if (!result) {
     return res.sendStatus(401)
   }
-  generateTokensThenSetCookie(result, res)
+  await generateTokensThenSetCookie(result, res)
   res.json(result)
 }
 
@@ -282,16 +291,19 @@ async function httpUpdateSponsor (req: Request, res: Response) {
   const updatedUser = await updateSponsor(userId)
   await redisClient.del(`userData:${updatedUser!.email}`)
   sponsorPaidEE.emit('paid')
-  res.redirect('http://localhost:8080/#/pay-confirmed')
+  res.redirect('https://joeln.site/#/pay-confirmed')
 }
 
 async function httpLogout (req: Request, res: Response) {
   const refreshToken = req.cookies.reToken
+  const reqIp = req.headers['x-forwarded-for'] || req.ip
   const decoded = jwt.decode(refreshToken, { complete: true })
   if (decoded) {
     // @ts-ignore
     const userId = decoded.payload.id
     await redisClient.hDel('refreshTokenCollection', userId)
+  } else {
+    await redisClient.hDel('iosUsersIp', JSON.stringify(reqIp))
   }
   res.json('ok')
 }

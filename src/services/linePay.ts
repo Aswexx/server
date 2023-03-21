@@ -7,6 +7,11 @@ const LINE_PAY_URL = 'https://sandbox-api-pay.line.me/v3/payments/request'
 const REQ_URI = '/v3/payments/request'
 const { LINE_CHANNEL_ID, LINE_CHANNEL_SECRET_KEY } = process.env
 
+const DOMAIN_NAME =
+  process.env.HOST_ENV === 'dev'
+    ? 'https://192.168.0.105:4000'
+    : 'https://joeln-api.fun'
+
 async function generateOrder (userId: string) {
   const order = {
     amount: 10,
@@ -27,8 +32,8 @@ async function generateOrder (userId: string) {
       }
     ],
     redirectUrls: {
-      confirmUrl: 'http://localhost:4000/users/sponsor/confirm',
-      cancelUrl: 'http://localhost:4000/users/sponsor/cancel'
+      confirmUrl: `${DOMAIN_NAME}/users/sponsor/confirm`,
+      cancelUrl: `${DOMAIN_NAME}/users/sponsor/cancel`
     }
   }
 
@@ -57,24 +62,19 @@ function generateConfig (order: object) {
 async function submitLinePayOrder (userId: string) {
   const order = await generateOrder(userId)
   const config = generateConfig(order)
-  console.log('🔗🔗', order, config)
 
   return await axios.post(LINE_PAY_URL, order, config)
 }
 
 async function linePay (req: Request, res: Response, next: NextFunction) {
   const { userId } = req.body
-  console.log('🐶🐶', userId)
   const linePayResponse = await submitLinePayOrder(userId)
-  console.log(linePayResponse.data, linePayResponse.data.info.paymentUrl.web)
 
   if (linePayResponse.data.returnCode === '0000') {
-    // return res.redirect(linePayResponse.data.info.paymentUrl.web)
     return res.json({ linePay: linePayResponse.data.info.paymentUrl.web })
   }
 
-  // const result = await updateSponsor(userId)
-  res.json('ok')
+  res.json(null)
 }
 
 async function payConfirm (req: Request, res: Response, next: NextFunction) {
@@ -87,10 +87,7 @@ async function payConfirm (req: Request, res: Response, next: NextFunction) {
 }
 
 async function payCancel (req: Request, res: Response, next: NextFunction) {
-  console.log('😂', 'cancel!')
-  // return res.redirect('http://localhost:8080/')
   return res.send('交易取消')
-  // res.end()
 }
 
 export { linePay, payConfirm, payCancel }

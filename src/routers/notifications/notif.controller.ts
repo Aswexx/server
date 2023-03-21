@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { createNotif, getNotifs } from '../../models/notif.model'
+import { createNotif, getNotifs, updateNotif } from '../../models/notif.model'
 import { interactEE } from '../../notificationSocket'
 import { getFileFromS3 } from '../../services/s3'
 
@@ -45,7 +45,6 @@ async function httpGetNotifs (req: Request, res: Response) {
 }
 
 async function httpCreatNotif (req: Request, res: Response) {
-  console.log('ready to save notif then push', req.body)
   const result = await createNotif(req.body)
   if (result) {
     result.informer.avatarUrl = await getFileFromS3(result.informer.avatarUrl)
@@ -54,7 +53,13 @@ async function httpCreatNotif (req: Request, res: Response) {
   res.json(result)
 }
 
+async function httpUpdateNotif (req: Request, res: Response) {
+  const { notifId } = req.params
+  await updateNotif(notifId)
+}
+
 export {
   httpGetNotifs,
-  httpCreatNotif
+  httpCreatNotif,
+  httpUpdateNotif
 }

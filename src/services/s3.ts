@@ -1,6 +1,7 @@
 import { PutObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import crypto from 'crypto'
+import fs from 'fs'
 
 const awsConfig = {
   bucketName: process.env.AWS_BUCKET_NAME,
@@ -28,10 +29,10 @@ let s3: S3Client | undefined
 
 const uniqueKey = (bytes = 32) => crypto.randomBytes(bytes).toString('hex')
 
-  interface Savable {
-    Body: Buffer | undefined
-    ContentType: string | undefined
-  }
+interface Savable {
+  Body: Buffer | undefined
+  ContentType: string | undefined
+}
 
 async function addNewFileToS3 (file: Savable): Promise<string> {
   if (!s3) return ''
@@ -59,7 +60,17 @@ async function getFileFromS3 (fileKey: string): Promise<string> {
   return await getSignedUrl(s3, command, { expiresIn: 60 * 60 })
 }
 
-export {
-  addNewFileToS3,
-  getFileFromS3
+async function saveLogToS3 (filePath: string, key: string) {
+  const fileContent = fs.readFileSync(filePath)
+  const params = {
+    Bucket: 'posquare-log',
+    Key: key,
+    Body: fileContent
+  }
+
+  console.log(s3, params)
+
+  await s3?.send(new PutObjectCommand(params))
 }
+
+export { addNewFileToS3, getFileFromS3, saveLogToS3 }

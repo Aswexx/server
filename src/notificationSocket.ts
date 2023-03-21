@@ -1,7 +1,7 @@
 import { Server } from 'socket.io'
 import { EventEmitter } from 'events'
 import { setOnlineUserState, getOnlineUserState, updateOnlineUserState } from './services/redis'
-import { createMentionNotifsThenGet, NotifType, updateNotifsReadState } from './models/notif.model'
+import { createMentionNotifsThenGet, NotifType } from './models/notif.model'
 import { createMentionsThenGet } from './models/mention.model'
 import { getFileFromS3 } from './services/s3'
 
@@ -23,10 +23,8 @@ function notificationSocket (io: Server) {
     let interactEventHandler: (notif: { [key: string]: string }) => void
 
     socket.on('setChannel', (listeningUserId) => {
-      console.log('notif channel created!')
       socket.join(listeningUserId)
       interactEventHandler = (notif) => {
-        console.log(listeningUserId, notif)
         if (listeningUserId !== notif.receiverId) return
         notification.in(listeningUserId).emit('notification', notif)
       }
@@ -41,11 +39,6 @@ function notificationSocket (io: Server) {
       sponsorPaidEE.on('paid', publishUpdateSponsorState)
     })
 
-    socket.on('updateNotifsReadState', (notifs) => {
-      console.log('readNotifs', notifs)
-      updateNotifsReadState(notifs)
-    })
-
     socket.on('disconnect', async (reason) => {
       console.log(`notif Client ${socket.id} disconnected.\nreason: ${reason}`)
       const onlineUserState = await updateOnlineUserState(socket.id)
@@ -56,7 +49,6 @@ function notificationSocket (io: Server) {
 }
 
 async function notificateTagedUsers (tagedContent: { [keys: string]: any }, tagedUsers: string[]) {
-  console.log({ tagedContent })
   let notifs
   let mentionedUsers
   if (!Object.hasOwn(tagedContent, 'onCommentId')) {

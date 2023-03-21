@@ -166,10 +166,6 @@ model LoginInfo {
   loginEmail String @unique @map("login_email")
   password   String @unique
 
-  // TODO: check refister flow
-  // user   User   @relation(fields: [userId], references: [id])
-  // userId String @unique
-
   @@map("login_info")
 }
 

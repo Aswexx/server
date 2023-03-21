@@ -32,7 +32,6 @@ async function getNotifs (userId: string) {
       },
       orderBy: { createdAt: 'desc' }
     })
-    console.log('@@', result)
     return result
   })
 }
@@ -107,10 +106,10 @@ async function createMentionNotifsThenGet (notifData: NotifToSave[]) {
   })
 }
 
-async function updateNotifsReadState (notifs: string[]) {
+async function updateNotif (notifId: string) {
   return tryCatch(async () => {
-    await prisma.notification.updateMany({
-      where: { id: { in: notifs } },
+    await prisma.notification.update({
+      where: { id: notifId },
       data: { isRead: true }
     })
   })
@@ -121,6 +120,6 @@ export {
   createNotif,
   createMultiNotifs,
   createMentionNotifsThenGet,
-  updateNotifsReadState,
+  updateNotif,
   NotifType
 }
