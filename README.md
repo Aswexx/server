@@ -43,13 +43,13 @@ https://aswexx.github.io/posquare-presentation/
 2. 使用非 gmail 信箱註冊新帳號後登入(需收驗證碼信)
 3. 直接使用以下任一組測試帳號密碼登入:
 
--帳號: test1@example.com
+- 帳號: test1@example.com
 密碼: 123
--帳號: test2@example.com
+- 帳號: test2@example.com
 密碼: 123
--帳號: test3@example.com
+- 帳號: test3@example.com
 密碼: 123
--帳號: test4@example.com
+- 帳號: test4@example.com
 密碼: 123
 
 ===========
